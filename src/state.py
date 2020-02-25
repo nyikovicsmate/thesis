@@ -2,6 +2,8 @@ import copy
 import cv2
 import numpy as np
 
+from src.actions import *
+
 
 class State:
     MOVE_RANGE = 3
@@ -61,3 +63,23 @@ class State:
                                     image_batch_copy)
 
         return image_batch_copy
+
+    @staticmethod
+    def update_v2(image_batch: np.ndarray,
+               actions_batch: np.ndarray) -> np.ndarray:
+
+        actions = {
+            0: DoNothing(),
+            1: IncrementByOne(),
+            2: DecrementByOne()
+        }
+
+        for img, action in zip(image_batch, actions_batch):
+            img_updated = np.zeros_like(img)
+            for i in range(img.shape[0]):
+                for j in range(img.shape[1]):
+                    img_updated[i,j] = actions[action[i,j]].apply(img, i, j)
+
+
+
+
