@@ -1,5 +1,5 @@
 """
-Prerocessing script.
+Preprocessing script.
 
 usage: preprocess.py [-h] [-a AUGMENT_VALUE] [-f {png,hdf,lmdb}] [-g]
                      [-m {clip,clip_rnd,scale,scale_rnd}] [-n NAME]
@@ -40,12 +40,19 @@ import numpy as np
 from tqdm import tqdm
 from abc import ABC
 import copy
+import rawpy
 
 
 class Image:
     def __init__(self, path: pathlib.Path):
         self.path = path
-        self.data = np.array(cv2.imread(str(path), cv2.IMREAD_COLOR), dtype=np.uint8)
+        if self.path.suffix == ".dng":
+            with rawpy.imread(str(self.path)) as raw:
+                rgb = raw.postprocess()
+                bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
+                self.data = np.array(bgr, dtype=np.uint8)
+        else:
+            self.data = np.array(cv2.imread(str(self.path), cv2.IMREAD_COLOR), dtype=np.uint8)
 
     @property
     def shape(self):
@@ -194,7 +201,7 @@ class Processor:
                  name: str,
                  size: Tuple[int, int],
                  root: pathlib.Path):
-        self.supported_extensions: List[str] = ["jpg", "png"]
+        self.supported_extensions: List[str] = ["jpg", "png", "dng"]
         self.augment_value = augment_value
         self.format = format
         self.grayscale = grayscale
