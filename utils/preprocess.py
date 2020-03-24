@@ -2,13 +2,16 @@
 Preprocessing script.
 
 usage: preprocess.py [-h] [-a AUGMENT_VALUE] [-f {png,hdf,lmdb}] [-g]
-                     [-m {clip,clip_rnd,scale,scale_rnd}] [-n NAME]
-                     [-s SIZE SIZE]
-                     [root]
+                     [-m {clip,clip_rnd,scale,scale_rnd}] [-s SIZE SIZE]
+                     [dst] [src [src ...]]
 
 positional arguments:
-  root                  The root directory from where the search for images
-                        starts. (default: '.)'
+  dst                   Name of the output file/directory. Can also be path
+                        e.g.: './results_png' or './a/b/hdf.h5'. (default:
+                        './dataset')
+  src                   Name(s) of the source directory(s) from where the
+                        search for images starts. Can also be path(s).
+                        (default: '.')
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -18,16 +21,15 @@ optional arguments:
                         2nd pixel (in a checkerboard pattern) set to
                         augment_value [0-255].
   -f {png,hdf,lmdb}, --format {png,hdf,lmdb}
-                        Output format to use. Supported: png, hdf, lmdb. (default:
-                        png)
-  -g, --grayscale       Grayscale image.
+                        Output format to use. Supported: png, hdf, lmdb.
+                        (default: png)
+  -g, --grayscale       Grayscale images.
   -m {clip,clip_rnd,scale,scale_rnd}, --method {clip,clip_rnd,scale,scale_rnd}
                         Processing method to use. (default: scale)
-  -n NAME, --name NAME  Name of the output dataset file/directory. (default:
-                        'dataset')
   -s SIZE SIZE, --size SIZE SIZE
-                        Output size of images [height, width]. (default: [225,
-                        225])
+                        Output size of images [height, width]. (default: [70,
+                        70])
+
 """
 import argparse
 import pathlib
@@ -87,7 +89,7 @@ class Store(ABC):
         """
         self.initialized = False
         self.augment = augment
-        self.path = path if path.is_absolute() else path.resolve()
+        self.path = path if path.is_absolute() else path.absolute()
 
     def initialize(self):
         raise NotImplementedError()
@@ -97,7 +99,7 @@ class Store(ABC):
             self.initialize()
         self._store(index, image)
 
-    def store_augmented(self, index:int, image: Image):
+    def store_augmented(self, index: int, image: Image):
         if not self.initialized:
             self.initialize()
         self._store_augmented(index, image)
@@ -126,16 +128,18 @@ class PNGStore(Store):
         self.initialized = True
 
     def _store(self, index: int, image: Image):
-        cv2.imwrite(str(pathlib.Path.joinpath(self.images_path, f"{index}.png")), image.data)
+        cv2.imwrite(str(self.images_path.joinpath(f"{index}.png")), image.data)
 
     def _store_augmented(self, index: int, image: Image):
-        cv2.imwrite(str(pathlib.Path.joinpath(self.augmented_images_path, f"{index}.png")), image.data)
+        cv2.imwrite(str(self.augmented_images_path.joinpath(f"{index}.png")), image.data)
 
 
 class HDFStore(Store):
     def __init__(self, path: pathlib.Path, augment: bool, dataset_shape: Tuple):
         super().__init__(path, augment)
         self.dataset_shape = dataset_shape
+        if self.path.suffix != ".h5":
+            self.path = pathlib.Path(f"{str(self.path)}.h5")
 
     def initialize(self):
         """Creates .h5 file for the dataset."""
@@ -146,7 +150,7 @@ class HDFStore(Store):
                 if self.augment:
                     file.create_dataset("augmented_images", shape=self.dataset_shape, dtype=np.uint8)
             self.initialized = True
-        except OSError as e:
+        except OSError:
             raise FileExistsError(f"File {self.path} already exists.")
 
     def _store(self, index: int, image: Image):
@@ -198,25 +202,21 @@ class Processor:
                  format: str,
                  grayscale: bool,
                  method: Callable[[Image, Tuple[int, int]], Image],
-                 name: str,
                  size: Tuple[int, int],
-                 root: pathlib.Path):
+                 dst: pathlib.Path,
+                 src: List[pathlib.Path]):
         self.supported_extensions: List[str] = ["jpg", "png", "dng"]
         self.augment_value = augment_value
         self.format = format
         self.grayscale = grayscale
         self.method = method
-        self.name = name
         self.size = size
-        self.root = root
-        self.validate()
-
-    def validate(self):
-        # TODO validate attributes (root, format, etc.)
-        pass
+        self.dst = dst
+        self.src = src
 
     def process(self):
-        print(f"Looking for images under {self.root}")
+        print(f"Looking for images under: {chr(10)}"  # chr(10) = newline 
+              f"{chr(10).join([str(path) for path in self.src])}")
         paths = self._get_image_paths()
         image_cnt = len(paths)
         print(f"Found {image_cnt} images.")
@@ -224,15 +224,15 @@ class Processor:
         store = None
         augment = True if 0 <= self.augment_value <= 255 else False
         if format == "png":
-            store = PNGStore(pathlib.Path.joinpath(self.root, self.name), augment)
+            store = PNGStore(self.dst, augment)
         elif format == "hdf":
             dataset_shape = (image_cnt, *self.size) if self.grayscale else (image_cnt, *self.size, 3)
-            store = HDFStore(pathlib.Path.joinpath(self.root, f"{self.name}.h5"), augment, dataset_shape)
+            store = HDFStore(self.dst, augment, dataset_shape)
         elif format == "lmdb":
             dataset_shape = (image_cnt, *self.size) if self.grayscale else (image_cnt, *self.size, 3)
-            store = LMDBStore(pathlib.Path.joinpath(self.root, self.name), augment, dataset_shape)
+            store = LMDBStore(self.dst, augment, dataset_shape)
 
-        print("Processing images.")
+        print(f"Processing & saving images under:{chr(10)}{store.path}")
         with tqdm(total=image_cnt) as pbar:
             for i, path in enumerate(paths):
                 image = Image(path)
@@ -253,7 +253,8 @@ class Processor:
         """
         image_paths = []
         for ext in self.supported_extensions:
-            image_paths.extend(list(self.root.rglob(f"*.{ext}")))
+            for s in self.src:
+                image_paths.extend(list(s.rglob(f"*.{ext}")))
         return image_paths
 
     @staticmethod
@@ -330,12 +331,15 @@ if __name__ == '__main__':
     parser.add_argument("-m", "--method", dest="method", action="store", default="scale", type=str,
                         choices=["clip", "clip_rnd", "scale", "scale_rnd"],
                         help="Processing method to use. (default: %(default)s)")
-    parser.add_argument("-n", "--name", dest="name", action="store", default="dataset", type=str,
-                        help="Name of the output dataset file/directory. (default: '%(default)s')")
-    parser.add_argument("-s", "--size", dest="size", action="store", default=[225, 225], nargs=2, type=int,
+    parser.add_argument("-s", "--size", dest="size", action="store", default=[70, 70], nargs=2, type=int,
                         help="Output size of images [height, width]. (default: %(default)s)")
-    parser.add_argument("root", action="store", default=".", type=str, nargs="?",
-                        help="The root directory from where the search for images starts. (default: '%(default)s)'")
+    parser.add_argument("dst", action="store", default="./dataset", type=str, nargs="?",
+                        help="Name of the output file/directory. Can also be path e.g.: './results_png' or "
+                             "'./a/b/hdf.h5'. (default: '%(default)s')")
+    parser.add_argument("src", action="store", default=".", type=str, nargs="*",
+                        help="Name(s) of the source directory(s) from where the search for images starts. Can also "
+                             "be path(s). (default: '%(default)s')")
+
     args = parser.parse_args()
 
     format = args.format
@@ -346,9 +350,9 @@ if __name__ == '__main__':
              Processor.scale if args.method == "scale" else \
              Processor.scale_rnd if args.method == "scale_rnd" else \
              None
-    name = args.name
     size = tuple(args.size)
-    root = pathlib.Path(__file__).parent if not args.root else pathlib.Path(args.root).resolve()
+    dst = pathlib.Path(args.dst).absolute()
+    src = [pathlib.Path(s).absolute() for s in args.src]
 
-    p = Processor(augment_value, format, grayscale, method, name, size, root)
+    p = Processor(augment_value, format, grayscale, method, size, dst, src)
     p.process()
