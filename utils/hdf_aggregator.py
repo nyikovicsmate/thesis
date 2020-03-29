@@ -41,10 +41,13 @@ class Aggregator:
                 if dataset_shape is not None and dataset_shape[1:] != shape[1:]:
                     raise OSError(f"Dataset mismatch, only datasets with same sized images can be aggregated.")
                 dataset_shape = shape if dataset_shape is None else (dataset_shape[0] + shape[0], *shape[1:])
-                if augment is True and len(file["augmented_images"]) == 0:
-                    raise OSError(f"Dataset mismatch, {s.name} doesn't contain augmented images, while the other "
-                                  f"datasets do.")
-                augment = True if True else len(file["augmented_images"]) > 0
+                try:
+                    _ = len(file["augmented_images"])
+                    augment = True
+                except KeyError:
+                    if augment:
+                        raise OSError(f"Dataset mismatch, {s.name} doesn't contain augmented images, while the other "
+                                      f"datasets do.")
         try:
             with tqdm(total=dataset_shape[0]) as pbar:
                 with h5py.File(str(self.dst), "w-") as dst_file:
