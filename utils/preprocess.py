@@ -65,7 +65,7 @@ class Image:
         return self.data.shape[0], self.data.shape[1]
 
     def grayscale(self):
-        self.data = cv2.cvtColor(self.data, cv2.COLOR_RGB2GRAY)
+        self.data = cv2.cvtColor(self.data, cv2.COLOR_BGR2GRAY)
 
     def resize(self, size: Tuple[int, int]):
         self.data = cv2.resize(self.data, (size[1], size[0]), interpolation=cv2.INTER_CUBIC)
