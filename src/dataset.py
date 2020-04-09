@@ -3,7 +3,7 @@ import h5py
 import pathlib
 import numpy as np
 from abc import ABC, abstractmethod
-from typing import Dict, List, Union, Callable
+from typing import Dict, List, Union, Callable, Tuple
 from src.config import *
 
 
@@ -92,6 +92,25 @@ class Dataset(ABC):
         raise NotImplementedError()
 
     @abstractmethod
+    def split(self, ratio: Tuple, split_exactly: bool = False) -> List["Dataset"]:
+        """Splits the dataset into smaller chunks according to the `ratio` parameter.
+
+            This transformation takes the whole length of the dataset, and splits
+            it's contents into smaller parts. Each of this parts' length is proportionate
+            to the ratio given by the `ratio` parameter. E.g. a common scenario is to
+            split the dataset into 3 parts (train, test, validation) in a manner of 80%-10%-10%
+            one would call this function with `ratio=(8,1,1)` or `ratio=(80,10,10)` etc.
+            Args:
+              ratio: The split ratio.
+              split_exactly: If `True`, truncates the number of items in the dataset to be a
+              multiple of `sum(ratio)`. This way guaranteeing the exact ratios.
+            Returns:
+              Dataset: A list of `Dataset`-s. The actual number of datasets are determined by
+              the `ratio` parameter.
+            """
+        raise NotImplementedError()
+
+    @abstractmethod
     def map(self, map_func: Callable) -> "Dataset":
         """Maps `map_func` across the elements of this dataset.
 
@@ -164,6 +183,16 @@ class HDFDataset(Dataset):
         _copy._iter.args = {"repeat": count}
         return _copy
 
+    def split(self, ratio: Tuple, split_exactly: bool = False) -> List["Dataset"]:
+        _copies = []
+        for i in range(len(ratio)):
+            _copy = copy.copy(self)
+            # append the index of the dataset to the ratio parameter
+            r = (*ratio, i)
+            _copy._iter.args = {"ratio": r, "split_exactly": split_exactly}
+            _copies.append(_copy)
+        return _copies
+
     def map(self, map_func) -> "HDFDataset":
         if not callable(map_func):
             raise TypeError("'func' must be callable.")
@@ -185,7 +214,9 @@ class HDFDataset(Dataset):
                 "repeat": -1,
                 "shuffle": False,
                 "seed": np.random.randint(np.iinfo(np.int32).max),
-                "reshuffle_each_iteration": True
+                "reshuffle_each_iteration": True,
+                "ratio": None,   # indicates whether the dataset's been already split before (datasets cannot re-split)
+                "split_exactly": False
             }
             self._map_funcs = []
 
@@ -197,7 +228,16 @@ class HDFDataset(Dataset):
                 # try to get the length of the dataset
                 # if the dataset isn't used within a resource block the getter will throw a TypeError
                 _len = len(self._dataset._images_dataset)
-                self.indexes = np.arange(_len)
+                if self._args["ratio"] is None:
+                    self.indexes = np.arange(_len)
+                else:
+                    _total = np.sum(self._args["ratio"][:-1])
+                    # truncate the length if necessary
+                    if self._args["split_exactly"] is True and _len % _total != 0:
+                        _len -= _len % _total
+                    _start = 0 if self._args["ratio"][-1] == 0 else (np.sum(self._args["ratio"][:self._args["ratio"][-1]]) / _total) * _len
+                    _end = _start + (self._args["ratio"][self._args["ratio"][-1]] / _total) * _len
+                    self.indexes = np.arange(int(_start), int(_end))
                 if self._args["step"] == -1:
                     self._args["step"] = _len
                 if self._args["shuffle"]:
