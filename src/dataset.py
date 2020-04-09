@@ -1,10 +1,10 @@
 import copy
-
 import h5py
 import pathlib
 import numpy as np
 from abc import ABC, abstractmethod
 from typing import Dict, List, Union, Callable
+from src.config import *
 
 
 # TODO: unit tests
@@ -17,14 +17,12 @@ class Dataset(ABC):
         """
         :param path:  absolute or relative path (from the project's source directory) to the dataset file
         """
-        # TODO: import globals, root path sould not depend on this exact file's position
-        self._root = pathlib.Path(__file__).parent.parent
         if not isinstance(path, pathlib.Path):
             path = pathlib.Path(path)
-        self._path = self._root.joinpath(path).absolute()
+        self._path = ROOT_PATH.joinpath(path).absolute()
         if not self._path.exists():
             raise FileExistsError(f"{self._path} does not exist. {chr(10)}"  # chr(10) = newline
-                                  f"For relative paths, root is: {chr(10)} {self._root.absolute()} {chr(10)}"
+                                  f"For relative paths, root is: {chr(10)} {ROOT_PATH} {chr(10)}"
                                   f"Parameter given: {chr(10)} {path}")
 
     @abstractmethod
