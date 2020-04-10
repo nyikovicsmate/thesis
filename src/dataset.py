@@ -211,7 +211,7 @@ class HDFDataset(Dataset):
             self._args = {  # default argument values
                 "step": -1,
                 "drop_remainder": False,
-                "repeat": -1,
+                "repeat": 0,    # don't repeat
                 "shuffle": False,
                 "seed": np.random.randint(np.iinfo(np.int32).max),
                 "reshuffle_each_iteration": True,
