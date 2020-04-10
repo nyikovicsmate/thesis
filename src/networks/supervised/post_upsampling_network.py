@@ -2,13 +2,13 @@ import tensorflow as tf
 
 from src.config import *
 from src.networks.network import Network
-from src.models.supervised import PreUpsamplingModel
+from src.models import PostUpsamplingModel
 
 
-class PreUpsamplingNetwork(Network):
+class PostUpsamplingNetwork(Network):
 
     def __init__(self):
-        model = PreUpsamplingModel(scaling_factor=2)
+        model = PostUpsamplingModel(scaling_factor=2)
         super().__init__(model)
 
     def save_state(self):

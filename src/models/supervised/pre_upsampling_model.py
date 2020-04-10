@@ -5,7 +5,7 @@ import tensorflow as tf
 class PreUpsamplingModel(tf.keras.models.Model):
 
     def __init__(self,
-                 scaling_factor: float = 2,
+                 scaling_factor: float,
                  input_shape: Tuple[int, int, int] = (None, None, 1)):    # (height, width, depth), arbitrary grayscale images as default
         super().__init__()
         self.scaling_factor = scaling_factor
