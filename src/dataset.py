@@ -64,13 +64,13 @@ class Dataset(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def repeat(self, count: int = -1) -> "Dataset":
+    def repeat(self, count: int = 1) -> "Dataset":
         """Repeats this dataset so each original value is seen `count` times.
 
             Args:
               count: (Optional.) An integer, representing the number of times
                 the dataset should be repeated. The default behavior (if
-                `count` is `-1`) is for the dataset be repeated indefinitely.
+                `count` is `1`) is for the dataset be repeated once.
             Returns:
               Dataset: A `Dataset`.
             """
@@ -137,7 +137,8 @@ class HDFDataset(Dataset):
         self._iter = self.HDFDatasetIterator(self)
 
     def __iter__(self):
-        return self._iter
+        self._iter = copy.copy(self._iter)
+        return iter(self._iter)
 
     def __next__(self):
         return next(iter(self))
@@ -178,7 +179,9 @@ class HDFDataset(Dataset):
         _copy._iter.args = {"shuffle": True, "seed": seed, "reshuffle_each_iteration": reshuffle_each_iteration}
         return _copy
 
-    def repeat(self, count: int = -1) -> "HDFDataset":
+    def repeat(self, count: int = 1) -> "HDFDataset":
+        if count <= 0:
+            raise ValueError("Repeat count should be a positive integer.")
         _copy = copy.copy(self)
         _copy._iter.args = {"repeat": count}
         return _copy
@@ -211,7 +214,7 @@ class HDFDataset(Dataset):
             self._args = {  # default argument values
                 "step": -1,
                 "drop_remainder": False,
-                "repeat": 0,    # don't repeat
+                "repeat": 1,    # repeat/replicate once
                 "shuffle": False,
                 "seed": np.random.randint(np.iinfo(np.int32).max),
                 "reshuffle_each_iteration": True,
@@ -221,9 +224,6 @@ class HDFDataset(Dataset):
             self._map_funcs = []
 
         def __iter__(self):
-            return self
-
-        def __next__(self):
             if self.indexes is None:
                 # try to get the length of the dataset
                 # if the dataset isn't used within a resource block the getter will throw a TypeError
@@ -243,34 +243,20 @@ class HDFDataset(Dataset):
                 if self._args["shuffle"]:
                     np.random.seed(self._args["seed"])
                     np.random.shuffle(self.indexes)
+                if self._args["repeat"] > 1:
+                    self.indexes = np.tile(self.indexes, self._args["repeat"])
+            return self
+
+        def __next__(self):
             if self.i < len(self.indexes):
                 result = self._get_index_data(self.indexes[self.i:self.i + self._args["step"]])
                 self.i += self._args["step"]
                 # recheck boundaries
                 if self.i >= len(self.indexes):
+                    if self._args["shuffle"] and self._args["reshuffle_each_iteration"]:
+                        np.random.shuffle(self.indexes)
                     if self._args["drop_remainder"] is True:
-                        if self._args["repeat"] == -1 or self._args["repeat"] > 0:
-                            # if we drop the trunctated result, but have more repeats
-                            # get new results
-                            self.i = 0
-                            if self._args["shuffle"] and self._args["reshuffle_each_iteration"]:
-                                np.random.shuffle(self.indexes)
-                            result = self._get_index_data(self.indexes[self.i:self.i + self._args["step"]])
-                            # decrease repeat counter
-                            self._args["repeat"] = -1 if self._args["repeat"] == -1 else self._args["repeat"] - 1
-                        else:
-                            # if we drop the trunctated result, and have no more repeat counts
-                            # then invalidate this (last) iteration
-                            raise StopIteration()
-                    else:
-                        if self._args["repeat"] == -1 or self._args["repeat"] > 0:
-                            # if we don't drop this result and have more repeats
-                            # reset the index
-                            self.i = 0
-                            if self._args["shuffle"] and self._args["reshuffle_each_iteration"]:
-                                np.random.shuffle(self.indexes)
-                            # decrease repeat counter
-                            self._args["repeat"] = -1 if self._args["repeat"] == -1 else self._args["repeat"] - 1
+                        raise StopIteration()
                 # we got through all the checks
                 # apply the mapping transformations
                 for func in self._map_funcs:
@@ -278,6 +264,13 @@ class HDFDataset(Dataset):
                 return result
             else:
                 raise StopIteration()
+
+        def __copy__(self):
+            _copy = HDFDataset.HDFDatasetIterator(self._dataset)
+            _copy.indexes = self.indexes
+            _copy._args = self._args
+            _copy._map_funcs = self._map_funcs
+            return _copy
 
         @property
         def args(self):
