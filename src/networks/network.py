@@ -1,9 +1,11 @@
+import pickle
 from abc import ABC, abstractmethod
 from typing import Callable
 
 import numpy as np
 import tensorflow as tf
 
+from src.config import *
 from src.dataset import Dataset
 
 
@@ -12,14 +14,61 @@ class Network(ABC):
     def __init__(self,
                  model: tf.keras.models.Model):
         self.model = model
+        self._state = self.NetworkState()
 
-    @abstractmethod
+    class NetworkState:
+
+        def __init__(self):
+            self._train_time: int = 0
+            self.epochs: int = 0
+            self.train_loss: float = 0
+            self.valid_loss: float = 0
+
+        @property
+        def train_time(self) -> str:
+            secounds = self._train_time / 10**9
+            hours, rem = divmod(secounds, 3600)
+            minutes, rem = divmod(rem, 60)
+            secounds = rem
+            return f"{hours:02.0f}h:{minutes:02.0f}m:{secounds:02.0f}s"
+
+        @train_time.setter
+        def train_time(self, delta: int):
+            """
+            :param delta: The delta training time in ns. The total training time will be incremented by this value.
+            """
+            self._train_time += delta
+
+    @property
+    def state(self):
+        return self._state
+
     def save_state(self):
-        pass
+        # make sure the save directory exists
+        checkpoint_dir_path = ROOT_PATH.joinpath("checkpoints")
+        if not checkpoint_dir_path.exists() or not checkpoint_dir_path.is_dir():
+            LOGGER.error(f"Save directory {checkpoint_dir_path} does not exist. Creating it.")
+            checkpoint_dir_path.mkdir(parents=False, exist_ok=False)
+        # save the keras model to Tensorflow SavedModel format
+        model_dir_path = checkpoint_dir_path.joinpath(str.lower(self.__class__.__name__))
+        self.model.save(filepath=str(model_dir_path), overwrite=True, include_optimizer=True, save_format="tf")
+        # also save the state of the model
+        state_file_path = model_dir_path.joinpath("state.dat")
+        with open(str(state_file_path), "wb") as f:
+            pickle.dump(self.state, f)
 
-    @abstractmethod
     def load_state(self):
-        pass
+        # make sure the save directory exists
+        checkpoint_dir_path = ROOT_PATH.joinpath("checkpoints")
+        if not checkpoint_dir_path.exists() or not checkpoint_dir_path.is_dir():
+            raise FileExistsError(f"Save directory {checkpoint_dir_path} does not exist.")
+        # load the keras model from Tensorflow SavedModel format
+        model_dir_path = checkpoint_dir_path.joinpath(str.lower(self.__class__.__name__))
+        self.model = tf.keras.models.load_model(filepath=str(model_dir_path))
+        # also load the previous state of the model
+        state_file_path = model_dir_path.joinpath("state.dat")
+        with open(str(state_file_path), "rb") as f:
+            self._state = pickle.load(f)
 
     @abstractmethod
     def train(self, dataset_x: Dataset, dataset_y: Dataset, loss_func: Callable[[np.ndarray, np.ndarray], float], epochs: int, learning_rate: float):
