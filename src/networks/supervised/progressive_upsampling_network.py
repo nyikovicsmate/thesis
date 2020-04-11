@@ -2,13 +2,13 @@ import tensorflow as tf
 
 from src.config import *
 from src.networks.network import Network
-from src.models.supervised import PreUpsamplingModel
+from src.models import ProgressiveUpsamplingModel
 
 
-class PreUpsamplingNetwork(Network):
+class PostUpsamplingNetwork(Network):
 
     def __init__(self):
-        model = PreUpsamplingModel(scaling_factor=2)
+        model = ProgressiveUpsamplingModel(scaling_factor=4)    # increase the default scaling factor
         super().__init__(model)
 
     @tf.function

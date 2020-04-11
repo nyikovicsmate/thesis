@@ -11,13 +11,6 @@ class PostUpsamplingNetwork(Network):
         model = PostUpsamplingModel(scaling_factor=2)
         super().__init__(model)
 
-    def save_state(self):
-        # TODO serialize complete model state, instead of just parameters
-        self.model.save_weights("pre_upsampling", overwrite=True, save_format="tf")
-
-    def load_state(self):
-        self.model.load_weights("pre_upsampling")
-
     @tf.function
     def train_step(self, x, y, optimizer, loss_func):
         with tf.GradientTape() as tape:
