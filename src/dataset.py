@@ -3,7 +3,7 @@ import h5py
 import pathlib
 import numpy as np
 from abc import ABC, abstractmethod
-from typing import Dict, List, Union, Callable, Tuple
+from typing import Dict, List, Union, Callable, Tuple, Iterator
 from src.config import *
 
 
@@ -39,6 +39,11 @@ class Dataset(ABC):
 
     @abstractmethod
     def __exit__(self, exc_type, exc_val, exc_tb):
+        raise NotImplementedError()
+
+    @abstractmethod
+    def as_numpy_iterator(self) -> Iterator:
+        """Returns an iterator which converts all elements of the dataset to numpy."""
         raise NotImplementedError()
 
     @abstractmethod
@@ -170,6 +175,9 @@ class HDFDataset(Dataset):
                               "Are you missing a 'with' statement?")
         return self._file["images"]
 
+    def as_numpy_iterator(self) -> Iterator:
+        return self._iter
+
     def batch(self, batch_size: int, drop_remainder: bool = False) -> "HDFDataset":
         _copy = copy.copy(self)
         _copy._iter.args = {"step": batch_size, "drop_remainder": drop_remainder}
@@ -279,7 +287,7 @@ class HDFDataset(Dataset):
 
         @args.setter
         def args(self, value: Dict):
-            self._reset()  # reset iteration when setting new arguments
+            self.reset()  # reset iteration when setting new arguments
             for k, v in value.items():
                 self._args[k] = v if k in self._args.keys() else self._args[k]
 
@@ -289,10 +297,17 @@ class HDFDataset(Dataset):
 
         @map_funcs.setter
         def map_funcs(self, value):
-            self._reset()
+            self.reset()
             self._map_funcs = value
 
-        def _reset(self):
+        def next(self) -> np.ndarray:
+            return next(self)
+
+        def advance(self):
+            """Skips an iteration. Mainly used to keep iterators in sync."""
+            self.i += self.args["step"]
+
+        def reset(self):
             self.i = 0
             self.indexes = None
 
