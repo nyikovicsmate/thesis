@@ -3,7 +3,7 @@ import h5py
 import pathlib
 import numpy as np
 from abc import ABC, abstractmethod
-from typing import Dict, List, Union, Callable, Tuple, Iterator
+from typing import Dict, List, Union, Callable, Tuple, Iterator, Iterable
 from src.config import *
 
 
@@ -42,7 +42,7 @@ class Dataset(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def as_numpy_iterator(self) -> Iterator:
+    def as_numpy_iterator(self) -> "Dataset.DatasetIterator":
         """Returns an iterator which converts all elements of the dataset to numpy."""
         raise NotImplementedError()
 
@@ -131,6 +131,30 @@ class Dataset(ABC):
             """
         raise NotImplementedError()
 
+    class DatasetIterator(ABC):
+
+        @abstractmethod
+        def __iter__(self):
+            pass
+
+        @abstractmethod
+        def __next__(self):
+            pass
+
+        def next(self) -> np.ndarray:
+            """Returns the next elements. #TODO: also raisese Stopiteration"""
+            return next(iter(self))
+
+        @abstractmethod
+        def advance(self):
+            """Skips an iteration. Mainly used to keep iterators in sync."""
+            pass
+
+        @abstractmethod
+        def reset(self):
+            """Resets the iterator state."""
+            pass
+
 
 class HDFDataset(Dataset):
 
@@ -175,7 +199,7 @@ class HDFDataset(Dataset):
                               "Are you missing a 'with' statement?")
         return self._file["images"]
 
-    def as_numpy_iterator(self) -> Iterator:
+    def as_numpy_iterator(self) -> "HDFDataset.HDFDatasetIterator":
         return self._iter
 
     def batch(self, batch_size: int, drop_remainder: bool = False) -> "HDFDataset":
@@ -214,7 +238,7 @@ class HDFDataset(Dataset):
         _copy._iter.map_funcs += [map_func]
         return _copy
 
-    class HDFDatasetIterator:
+    class HDFDatasetIterator(Dataset.DatasetIterator):
 
         def __init__(self, dataset: "HDFDataset"):
             self._dataset = dataset
@@ -300,11 +324,7 @@ class HDFDataset(Dataset):
             self.reset()
             self._map_funcs = value
 
-        def next(self) -> np.ndarray:
-            return next(self)
-
         def advance(self):
-            """Skips an iteration. Mainly used to keep iterators in sync."""
             self.i += self.args["step"]
 
         def reset(self):
