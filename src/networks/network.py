@@ -1,6 +1,6 @@
 import pickle
 from abc import ABC, abstractmethod
-from typing import Callable
+from typing import Callable, Dict, List, Union
 
 import numpy as np
 import tensorflow as tf
@@ -71,7 +71,7 @@ class Network(ABC):
             self._state = pickle.load(f)
 
     @abstractmethod
-    def train(self, dataset_x: Dataset, dataset_y: Dataset, loss_func: Callable[[np.ndarray, np.ndarray], float], epochs: int, learning_rate: float):
+    def train(self, dataset_x: Dataset, dataset_y: Union[Dataset, List[Dataset]], loss_func: Callable[[np.ndarray, np.ndarray], float], epochs: int, learning_rate: float):
         pass
 
     def predict(self, x: np.ndarray) -> np.ndarray:
