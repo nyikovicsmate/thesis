@@ -5,21 +5,29 @@ import tensorflow as tf
 
 
 def train_pre_upsampled():
-    batch_size = 40
-    input_shape = (35, 35, 1)
+    batch_size = 80
     # seed = 1000
 
     normalize = lambda x: np.asarray(x / 255.0, dtype=np.float16)
-    ds_x = HDFDataset("C:/Users/nyiko/Documents/Projects/bme.thesis/bsd500_35_35.h5")\
+    ds_x = HDFDataset("bsd500_35_35.h5")\
         .batch(batch_size)\
         .map(normalize)
-    ds_y = HDFDataset("C:/Users/nyiko/Documents/Projects/bme.thesis/bsd500_70_70.h5")\
+    ds_y1 = HDFDataset("bsd500_70_70.h5")\
+        .batch(batch_size)\
+        .map(normalize)
+    ds_y2 = HDFDataset("bsd500_140_140.h5")\
         .batch(batch_size)\
         .map(normalize)
 
-    network = PreUpsamplingNetwork(input_shape)
+    network = PostUpsamplingNetwork()
     loss_func = tf.keras.losses.mse
-    network.train(ds_x, ds_y, loss_func, 100, 0.001)
+    network.train(ds_x, [ds_y1, ds_y2], loss_func, 10, 0.001)
+
+    # with ds_x.batch(10) as x, ds_y1.batch(10) as y:
+    #     # predict
+    #     y_pred = network.predict(next(x))
+    #     # evaluate
+    #     results = network.evaluate(next(y), y_pred)
 
 
 train_pre_upsampled()
