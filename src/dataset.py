@@ -158,6 +158,7 @@ class HDFDataset(Dataset):
 
     def __copy__(self):
         _copy = HDFDataset(self._path)
+        _copy._file = self._file    # don't lose the file object
         _copy._iter._args = copy.deepcopy(self._iter._args)
         _copy._iter._map_funcs = copy.deepcopy(self._iter._map_funcs)
         return _copy
