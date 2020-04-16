@@ -12,7 +12,7 @@ class IterativeSamplingNetwork(Network):
         model = IterativeSamplingModel()
         super().__init__(model)
 
-    def predict(self, x: np.ndarray) -> np.ndarray:
+    def predict(self, x: np.ndarray, *args, **kwargs) -> np.ndarray:
         # TODO
         pass
 

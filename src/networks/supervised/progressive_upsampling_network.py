@@ -12,7 +12,7 @@ class ProgressiveUpsamplingNetwork(Network):
         model = ProgressiveUpsamplingModel()    # increase the default scaling factor
         super().__init__(model)
 
-    def predict(self, x: np.ndarray) -> np.ndarray:
+    def predict(self, x: np.ndarray, *args, **kwargs) -> np.ndarray:
         # TODO
         pass
 

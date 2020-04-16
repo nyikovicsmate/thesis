@@ -1,6 +1,6 @@
 import pickle
 from abc import ABC, abstractmethod
-from typing import Callable, List, Union
+from typing import Callable, List, Union, Tuple
 
 import numpy as np
 import tensorflow as tf
@@ -79,10 +79,19 @@ class Network(ABC):
         pass
 
     @abstractmethod
-    def predict(self, x: np.ndarray) -> np.ndarray:
+    def predict(self, x: np.ndarray, *args, **kwargs) -> np.ndarray:
         """
         :param x: The batch of LR input images.
-        :return:
+        :param args, kwargs: Optional arguments for predictions. Possible values:
+                        - float
+                        A positive number defining the desired upsampling factor. (default: 2)
+                        - Union[Tuple[int, int], Tuple[int, int, int], Tuple[int, int, int, int]]
+                        A tuple defining the exact shape of the desired output. Accepted formats are
+                        (height, width) or (height, width, depth) or (batch, height, width, depth).
+                    Keywords for kwargs don't matter, input is determined solely by it's tpye. If none of
+                    the above input types are specified, predictions are carried out using the default
+                    upsampling factor of 2.
+        :return: The predicted image batch with values [0-255].
         """
         pass
 
