@@ -22,7 +22,6 @@ class Network(ABC):
             self._train_time: float = 0.0
             self.epochs: int = 0
             self.train_loss: float = 0
-            self.valid_loss: float = 0
 
         @property
         def train_time(self) -> str:
@@ -37,6 +36,12 @@ class Network(ABC):
             :param value: The delta training time in seconds. The total training time will be incremented by this value.
             """
             self._train_time += value
+
+        def __str__(self):
+            s = f"Train time: {self.train_time}{chr(10)}" + \
+                f"Epochs:     {self.epochs}{chr(10)}" + \
+                f"Loss:       {self.train_loss:.4f}"
+            return s
 
     @property
     def state(self):
