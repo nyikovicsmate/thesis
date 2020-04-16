@@ -15,8 +15,12 @@ class PreUpsamplingNetwork(Network):
         model = PreUpsamplingModel()
         super().__init__(model)
 
+    def predict(self, x: np.ndarray) -> np.ndarray:
+        # TODO
+        pass
+
     @tf.function
-    def train_step(self, x, y, scaling_factor, optimizer, loss_func):
+    def _train_step(self, x, y, optimizer, loss_func):
         with tf.GradientTape() as tape:
             _shape = tf.shape(y)  # expecting 4D tensor in channel_last format
             x = tf.image.resize(x, (_shape[1], _shape[2]), tf.image.ResizeMethod.BICUBIC)
@@ -45,8 +49,8 @@ class PreUpsamplingNetwork(Network):
             # train
             e_idx = 0
             while e_idx < epochs:
-                start_ns = time.time_ns()
-                train_loss = 0
+                start_sec = time.time()
+                train_loss = None
                 random_y_idx = np.random.randint(len(dataset_y))
                 # load the data
                 try:
@@ -59,15 +63,15 @@ class PreUpsamplingNetwork(Network):
                     # determine the scaling factor
                     # the dataset comprises of 4D vectors (batch_size, height, width, depth)
                     # scaling_factor = (y.shape[1] / x.shape[1], y.shape[2] / x.shape[2])
-                    train_loss += self.train_step(x, y, optimizer, loss_func)
+                    train_loss += self._train_step(x, y, optimizer, loss_func)
                     # update state
-                    delta_ns = time.time_ns() - start_ns
+                    delta_sec = time.time() - start_sec
                     self.state.epochs += 1
-                    self.state.train_loss = train_loss
-                    self.state.train_time = delta_ns
+                    self.state.train_loss = train_loss.numpy()
+                    self.state.train_time = delta_sec
                     LOGGER.info(f"Epoch: {e_idx} train_loss: {train_loss:.2f}")
                     if e_idx > 0 and e_idx % 100 == 0:
-                        LOGGER.info(f"Saving state at {e_idx + 1} epochs.")
+                        LOGGER.info(f"Saving state after {e_idx} epochs.")
                         self.save_state()
                     e_idx += 1
                 except StopIteration:

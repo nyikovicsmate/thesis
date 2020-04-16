@@ -13,7 +13,7 @@ _logfile = ROOT_PATH.joinpath(_timestamp + ".log")
 LOGGER = logging.getLogger(__name__)
 LOGGER.setLevel(logging.DEBUG)
 # https://docs.python.org/3/library/logging.html#logrecord-attributes
-_formatter = logging.Formatter(fmt="[%(asctime)s] %(levelname)5s %(funcName)s(): %(message)s")
+_formatter = logging.Formatter(fmt="[%(asctime)s] %(levelname)s %(funcName)s(): %(message)s")
 
 _handlers = [
     logging.StreamHandler(sys.stdout),   # stdout

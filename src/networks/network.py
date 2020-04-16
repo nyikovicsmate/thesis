@@ -1,6 +1,6 @@
 import pickle
 from abc import ABC, abstractmethod
-from typing import Callable, Dict, List, Union
+from typing import Callable, List, Union
 
 import numpy as np
 import tensorflow as tf
@@ -19,25 +19,24 @@ class Network(ABC):
     class NetworkState:
 
         def __init__(self):
-            self._train_time: int = 0
+            self._train_time: float = 0.0
             self.epochs: int = 0
             self.train_loss: float = 0
             self.valid_loss: float = 0
 
         @property
         def train_time(self) -> str:
-            secounds = self._train_time / 10**9
-            hours, rem = divmod(secounds, 3600)
+            hours, rem = divmod(self._train_time, 3600)
             minutes, rem = divmod(rem, 60)
             secounds = rem
             return f"{hours:02.0f}h:{minutes:02.0f}m:{secounds:02.0f}s"
 
         @train_time.setter
-        def train_time(self, delta: int):
+        def train_time(self, value: int):
             """
-            :param delta: The delta training time in ns. The total training time will be incremented by this value.
+            :param value: The delta training time in seconds. The total training time will be incremented by this value.
             """
-            self._train_time += delta
+            self._train_time += value
 
     @property
     def state(self):
@@ -47,7 +46,7 @@ class Network(ABC):
         # make sure the save directory exists
         checkpoint_dir_path = ROOT_PATH.joinpath("checkpoints")
         if not checkpoint_dir_path.exists() or not checkpoint_dir_path.is_dir():
-            LOGGER.error(f"Save directory {checkpoint_dir_path} does not exist. Creating it.")
+            LOGGER.warning(f"Save directory {checkpoint_dir_path} does not exist. Creating it.")
             checkpoint_dir_path.mkdir(parents=False, exist_ok=False)
         # save the keras model to Tensorflow SavedModel format
         model_dir_path = checkpoint_dir_path.joinpath(str.lower(self.__class__.__name__))
@@ -74,12 +73,13 @@ class Network(ABC):
     def train(self, dataset_x: Dataset, dataset_y: Union[Dataset, List[Dataset]], loss_func: Callable[[np.ndarray, np.ndarray], float], epochs: int, learning_rate: float):
         pass
 
+    @abstractmethod
     def predict(self, x: np.ndarray) -> np.ndarray:
         """
         :param x: The batch of LR input images.
         :return:
         """
-        return self.model(x).numpy()
+        pass
 
     @staticmethod
     def evaluate(y: np.ndarray, y_pred: np.ndarray):
@@ -115,44 +115,44 @@ class Network(ABC):
             for ssim, tv, psnr, mse, mae
             in zip(ssim_list, total_variation_list, psnr_list, mean_squared_error_list, mean_absolute_error_list)]
 
-        max = {"ssim": np.amax(ssim_list),
+        _max = {"ssim": np.amax(ssim_list),
                "total_variation": np.amax(total_variation_list),
                "psnr": np.amax(psnr_list),
                "mean_squared_error": np.amax(mean_squared_error_list),
                "mean_absolute_error": np.amax(mean_absolute_error_list)}
 
-        min = {"ssim": np.amin(ssim_list),
+        _min = {"ssim": np.amin(ssim_list),
                "total_variation": np.amin(total_variation_list),
                "psnr": np.amin(psnr_list),
                "mean_squared_error": np.amin(mean_squared_error_list),
                "mean_absolute_error": np.amin(mean_absolute_error_list)}
 
-        avg = {"ssim": np.average(ssim_list),
+        _avg = {"ssim": np.average(ssim_list),
                "total_variation": np.average(total_variation_list),
                "psnr": np.average(psnr_list),
                "mean_squared_error": np.average(mean_squared_error_list),
                "mean_absolute_error": np.average(mean_absolute_error_list)}
 
         print("SSIM")
-        print(f"max: [{np.where(ssim_list == max['ssim'])[0][0]}] {max['ssim']:.2f}    "
-              f"min: [{np.where(ssim_list == min['ssim'])[0][0]}] {min['ssim']:.2f}    "
-              f"avg: {avg['ssim']:.2f}")
+        print(f"max: [{np.where(ssim_list == _max['ssim'])[0][0]}] {_max['ssim']:.2f}    "
+              f"min: [{np.where(ssim_list == _min['ssim'])[0][0]}] {_min['ssim']:.2f}    "
+              f"avg: {_avg['ssim']:.2f}")
         print("TOTAL_VARIATION")
-        print(f"max: [{np.where(total_variation_list == max['total_variation'])[0][0]}] {max['total_variation']:.2f}    "
-              f"min: [{np.where(total_variation_list == min['total_variation'])[0][0]}] {min['total_variation']:.2f}    "
-              f"avg: {avg['total_variation']:.2f}")
+        print(f"max: [{np.where(total_variation_list == _max['total_variation'])[0][0]}] {_max['total_variation']:.2f}    "
+              f"min: [{np.where(total_variation_list == _min['total_variation'])[0][0]}] {_min['total_variation']:.2f}    "
+              f"avg: {_avg['total_variation']:.2f}")
         print("PSNR")
-        print(f"max: [{np.where(psnr_list == max['psnr'])[0][0]}] {max['psnr']:.2f}    "
-              f"min: [{np.where(psnr_list == min['psnr'])[0][0]}] {min['psnr']:.2f}    "
-              f"avg: {avg['psnr']:.2f}")
+        print(f"max: [{np.where(psnr_list == _max['psnr'])[0][0]}] {_max['psnr']:.2f}    "
+              f"min: [{np.where(psnr_list == _min['psnr'])[0][0]}] {_min['psnr']:.2f}    "
+              f"avg: {_avg['psnr']:.2f}")
         print("MEAN_SQUARED_ERROR")
-        print(f"max: [{np.where(mean_squared_error_list == max['mean_squared_error'])[0][0]}] {max['mean_squared_error']:.2f}    "
-              f"min: [{np.where(mean_squared_error_list == min['mean_squared_error'])[0][0]}] {min['mean_squared_error']:.2f}    "
-              f"avg: {avg['mean_squared_error']:.2f}")
+        print(f"max: [{np.where(mean_squared_error_list == _max['mean_squared_error'])[0][0]}] {_max['mean_squared_error']:.2f}    "
+              f"min: [{np.where(mean_squared_error_list == _min['mean_squared_error'])[0][0]}] {_min['mean_squared_error']:.2f}    "
+              f"avg: {_avg['mean_squared_error']:.2f}")
         print("MEAN_ABSOLUTE_ERROR")
-        print(f"max: [{np.where(mean_absolute_error_list == max['mean_absolute_error'])[0][0]}] {max['mean_absolute_error']:.2f}    "
-              f"min: [{np.where(mean_absolute_error_list == min['mean_absolute_error'])[0][0]}] {min['mean_absolute_error']:.2f}    "
-              f"avg: {avg['mean_absolute_error']:.2f}")
+        print(f"max: [{np.where(mean_absolute_error_list == _max['mean_absolute_error'])[0][0]}] {_max['mean_absolute_error']:.2f}    "
+              f"min: [{np.where(mean_absolute_error_list == _min['mean_absolute_error'])[0][0]}] {_min['mean_absolute_error']:.2f}    "
+              f"avg: {_avg['mean_absolute_error']:.2f}")
 
         return per_image_results
 
