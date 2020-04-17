@@ -9,7 +9,7 @@ class ProgressiveUpsamplingModel(tf.keras.models.Model):
                  input_shape: Tuple[int, int, int] = (None, None, 1)):
         super().__init__()
         self.conv_in = tf.keras.layers.Conv2D(input_shape=input_shape,
-                                              filters=128,
+                                              filters=1,
                                               kernel_size=3,
                                               strides=1,
                                               padding="same",
@@ -85,7 +85,7 @@ class ProgressiveUpsamplingModel(tf.keras.models.Model):
         x = self.conv_fe_1(inputs)
         x = self.conv_fe_2(x)
         x = self.conv_fe_3(x)
-        x_up = self.conv_fe_res(x)
+        x_up = self.conv_fu(x)
         x = self.conv_res(x_up)
         return x, x_up
 

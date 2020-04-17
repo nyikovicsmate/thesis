@@ -1,5 +1,5 @@
 import contextlib
-from typing import Tuple
+from typing import Tuple, List
 
 import tensorflow as tf
 import numpy as np
@@ -17,19 +17,20 @@ class ProgressiveUpsamplingNetwork(Network):
         super().__init__(model)
 
     @staticmethod
-    @tf.function
+    # @tf.function
     def _charbonnier_loss(x: tf.Tensor):
         epsilon = tf.constant(1e-3, dtype=tf.float32)
         return tf.sqrt(tf.add(tf.square(x), tf.square(epsilon)))
 
     @staticmethod
-    @tf.function
-    def custom_loss(values: Tuple[np.ndarray, np.ndarray]):
+    # @tf.function
+    def custom_loss(values: Tuple[List[tf.TensorArray], List[tf.TensorArray]]):
         def map_fn(t):
             y, yl = t
-            x = y - yl
+            x = tf.subtract(y, yl)
             return ProgressiveUpsamplingNetwork._charbonnier_loss(x)
-        loss = tf.map_fn(map_fn, values)
+        # TODO possibly change to vectorized map
+        loss = [tf.reduce_sum(tf.map_fn(map_fn, (values[0][i], values[1][i],), dtype=tf.float32)) for i in range(3)]
         loss = tf.reduce_mean(loss)
         return loss
 
@@ -41,11 +42,11 @@ class ProgressiveUpsamplingNetwork(Network):
         LOGGER.info(f"Predicted images with shape: {y_pred.shape}")
         return y_pred
 
-    @tf.function
+    # @tf.function
     def _train_step(self, x, y, optimizer):
         with tf.GradientTape() as tape:
             y_pred = self.model(x)
-            loss = self.custom_loss((y, y_pred))
+            loss = ProgressiveUpsamplingNetwork.custom_loss(([tf.convert_to_tensor(y_i) for y_i in y], y_pred,))
             grads = tape.gradient(loss, self.model.trainable_variables)
         optimizer.apply_gradients(zip(grads, self.model.trainable_variables))
         return tf.reduce_sum(loss)
