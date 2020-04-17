@@ -16,8 +16,11 @@ class PreUpsamplingNetwork(Network):
         super().__init__(model)
 
     def predict(self, x: np.ndarray, *args, **kwargs) -> np.ndarray:
-        # TODO
-        pass
+        size = self._parse_predict_optionals(x, args, kwargs)
+        x = tf.image.resize(x, size, tf.image.ResizeMethod.BICUBIC)
+        y_pred = self.model(x).numpy()
+        LOGGER.info(f"Predicted images with shape: {y_pred.shape}")
+        return y_pred
 
     @tf.function
     def _train_step(self, x, y, optimizer, loss_func):
