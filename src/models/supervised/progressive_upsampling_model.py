@@ -96,17 +96,21 @@ class ProgressiveUpsamplingModel(tf.keras.models.Model):
 
     @tf.function
     def call(self, inputs, training=None, mask=None):
+        outputs = [(), (), ()]
         x = self.conv_in(inputs)
-        # 1st layer
-        x, x_up = self.feature_extraction(x)
-        x_2x = self.image_reconstruction(inputs)
-        outputs_2x = tf.add(x, x_2x)
-        # 2nd layer
-        x, x_up = self.feature_extraction(x_up)
-        x_4x = self.image_reconstruction(inputs)
-        outputs_4x = tf.add(x, x_4x)
-        # 3rd layer
-        x, x_up = self.feature_extraction(x_up)
-        x_8x = self.image_reconstruction(inputs)
-        outputs_8x = tf.add(x, x_8x)
-        return outputs_2x, outputs_4x, outputs_8x
+        # 1st level
+        x_rl, x_up = self.feature_extraction(x)
+        xl = self.image_reconstruction(inputs)
+        yl = tf.add(x_rl, xl)
+        outputs[0] = (xl, x_rl, yl)
+        # 2nd level
+        x_rl, x_up = self.feature_extraction(x_up)
+        xl = self.image_reconstruction(yl)
+        yl = tf.add(x_rl, xl)
+        outputs[1] = (xl, x_rl, yl)
+        # 3rd level
+        x_rl, x_up = self.feature_extraction(x_up)
+        xl = self.image_reconstruction(yl)
+        yl = tf.add(x_rl, xl)
+        outputs[2] = (xl, x_rl, yl)
+        return outputs
