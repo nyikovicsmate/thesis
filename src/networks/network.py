@@ -83,7 +83,7 @@ class Network(ABC):
         """
         :param x: The batch of LR input images.
         :param args, kwargs: Optional arguments for predictions. Possible values:
-                        - float
+                        - int or float
                         A positive number defining the desired upsampling factor. (default: 2)
                         - Union[Tuple[int, int], Tuple[int, int, int], Tuple[int, int, int, int]]
                         A tuple defining the exact shape of the desired output. Accepted formats are
@@ -91,9 +91,37 @@ class Network(ABC):
                     Keywords for kwargs don't matter, input is determined solely by it's tpye. If none of
                     the above input types are specified, predictions are carried out using the default
                     upsampling factor of 2.
-        :return: The predicted image batch with values [0-255].
+        :return: The predicted image batch with values [0-1].
         """
         pass
+
+    @staticmethod
+    def _parse_predict_optionals(x: np.ndarray, args, kwargs) -> Tuple[int, int]:
+        """Helper function for parsing the optional arguments given to the `predict` function.
+
+        :return: The determined upsampling shape as a (height, width) tuple.
+        """
+        default_upsampling_factor = 2
+        assert 3 <= len(x.shape) <= 4, "`x` should be a (batch, height, width, depth) or (height, width, depth) shaped array."
+        x_size = (x.shape[1], x.shape[2]) if len(x.shape) == 4 else (x.shape[0], x.shape[1])
+        size = (int(x_size[0] * default_upsampling_factor), int(x_size[1] * default_upsampling_factor))   # the default size
+        params = [] + list(args) + list(kwargs.values())
+        if len(params) == 0:
+            # use default upsampling factor
+            LOGGER.info(f"Predicting using the default upsampling factor of {default_upsampling_factor}.")
+        elif len(params) == 1:
+            if type(params[0]) == int or type(params[0]) == float:
+                LOGGER.info(f"Predicting using the supplied upsampling factor of {params[0]}.")
+                size = (int(x_size[0] * params[0]), int(x_size[1] * params[0]))
+            elif type(params[0]) == tuple:
+                assert 2 <= len(params[0]) <= 4, f"Desired output size dim should be between 2 and 4, got {len(params[0])}"
+                size = (params[0][1], params[0][2]) if len(params[0]) == 4 else (params[0][0], params[0][1])
+                LOGGER.info(f"Predicting using the supplied size parameter {size}.")
+            else:
+                raise TypeError("The optional input parameter type did not match any of the acceptable types (int,float, tuple).")
+        else:
+            raise ValueError("Found more than 1 optional input parameters.")
+        return size
 
     @staticmethod
     def evaluate(y: np.ndarray, y_pred: np.ndarray):
