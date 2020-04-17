@@ -15,8 +15,11 @@ class PostUpsamplingNetwork(Network):
         super().__init__(model)
 
     def predict(self, x: np.ndarray, *args, **kwargs) -> np.ndarray:
-        # TODO
-        pass
+        size = self._parse_predict_optionals(x, args, kwargs)
+        y_pred = self.model(x)
+        y_pred = tf.image.resize(y_pred, size, tf.image.ResizeMethod.BICUBIC).numpy()
+        LOGGER.info(f"Predicted images with shape: {y_pred.shape}")
+        return y_pred
 
     @tf.function
     def _train_step(self, x, y, optimizer, loss_func):
