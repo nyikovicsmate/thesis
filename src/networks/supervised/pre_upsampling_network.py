@@ -51,12 +51,12 @@ class PreUpsamplingNetwork(Network):
             iter_y = [dataset.as_numpy_iterator() for dataset in dataset_y]
             # train
             e_idx = 0
+            train_loss = 0
+            start_sec = time.time()
             while e_idx < epochs:
-                start_sec = time.time()
-                train_loss = None
-                random_y_idx = np.random.randint(len(dataset_y))
-                # load the data
+                # process a batch
                 try:
+                    random_y_idx = np.random.randint(len(dataset_y))
                     x = iter_x.next()
                     for idx in range(len(iter_y)):
                         if idx == random_y_idx:
@@ -67,18 +67,20 @@ class PreUpsamplingNetwork(Network):
                     # the dataset comprises of 4D vectors (batch_size, height, width, depth)
                     # scaling_factor = (y.shape[1] / x.shape[1], y.shape[2] / x.shape[2])
                     train_loss += self._train_step(x, y, optimizer, loss_func)
+                except StopIteration:
+                    # reset iterators
+                    iter_x.reset()
+                    for _iter in iter_y:
+                        _iter.reset()
                     # update state
                     delta_sec = time.time() - start_sec
                     self.state.epochs += 1
                     self.state.train_loss = train_loss.numpy()
                     self.state.train_time = delta_sec
                     LOGGER.info(f"Epoch: {e_idx} train_loss: {train_loss:.2f}")
-                    if e_idx > 0 and e_idx % 100 == 0:
-                        LOGGER.info(f"Saving state after {e_idx} epochs.")
-                        self.save_state()
                     e_idx += 1
-                except StopIteration:
-                    # reset iterators
-                    iter_x.reset()
-                    for _iter in iter_y:
-                        _iter.reset()
+                    train_loss = 0
+                    start_sec = time.time()
+                    if e_idx > 0 and (e_idx + 1) % 100 == 0:
+                        LOGGER.info(f"Saving state after {e_idx + 1} epochs.")
+                        self.save_state()
