@@ -16,8 +16,8 @@ class PostUpsamplingModel(tf.keras.models.Model):
                                             use_bias=True,
                                             dilation_rate=1,
                                             activation="relu",
-                                            kernel_initializer=None,
-                                            bias_initializer=None)
+                                            kernel_initializer=tf.keras.initializers.he_uniform(),
+                                            bias_initializer=tf.keras.initializers.Zeros())
         self.conv2 = tf.keras.layers.Conv2D(filters=32,
                                             kernel_size=7,
                                             strides=1,
@@ -26,8 +26,8 @@ class PostUpsamplingModel(tf.keras.models.Model):
                                             use_bias=True,
                                             dilation_rate=1,
                                             activation="relu",
-                                            kernel_initializer=None,
-                                            bias_initializer=None)
+                                            kernel_initializer=tf.keras.initializers.he_uniform(),
+                                            bias_initializer=tf.keras.initializers.Zeros())
         self.conv3 = tf.keras.layers.Conv2D(filters=input_shape[-1],  # output depth is the same as the input's depth
                                             kernel_size=7,
                                             strides=1,
@@ -36,8 +36,8 @@ class PostUpsamplingModel(tf.keras.models.Model):
                                             use_bias=True,
                                             dilation_rate=1,
                                             activation="linear",  # no activation
-                                            kernel_initializer=None,
-                                            bias_initializer=None)
+                                            kernel_initializer=tf.keras.initializers.he_uniform(),
+                                            bias_initializer=tf.keras.initializers.Zeros())
 
     @tf.function
     def call(self, inputs, training=None, mask=None):

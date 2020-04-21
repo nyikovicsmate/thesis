@@ -17,8 +17,8 @@ class ProgressiveUpsamplingModel(tf.keras.models.Model):
                                               use_bias=True,
                                               dilation_rate=1,
                                               activation="relu",
-                                              kernel_initializer=None,
-                                              bias_initializer=None)
+                                              kernel_initializer=tf.keras.initializers.he_uniform(),
+                                              bias_initializer=tf.keras.initializers.Zeros())
         self.conv_fe_1 = tf.keras.layers.Conv2D(filters=64,
                                                 kernel_size=3,
                                                 strides=1,
@@ -27,8 +27,8 @@ class ProgressiveUpsamplingModel(tf.keras.models.Model):
                                                 use_bias=True,
                                                 dilation_rate=1,
                                                 activation="relu",
-                                                kernel_initializer=None,
-                                                bias_initializer=None)
+                                                kernel_initializer=tf.keras.initializers.he_uniform(),
+                                                bias_initializer=tf.keras.initializers.Zeros())
         self.conv_fe_2 = tf.keras.layers.Conv2D(filters=64,
                                                 kernel_size=3,
                                                 strides=1,
@@ -37,8 +37,8 @@ class ProgressiveUpsamplingModel(tf.keras.models.Model):
                                                 use_bias=True,
                                                 dilation_rate=1,
                                                 activation="relu",
-                                                kernel_initializer=None,
-                                                bias_initializer=None)
+                                                kernel_initializer=tf.keras.initializers.he_uniform(),
+                                                bias_initializer=tf.keras.initializers.Zeros())
         self.conv_fe_3 = tf.keras.layers.Conv2D(filters=64,
                                                 kernel_size=3,
                                                 strides=1,
@@ -47,8 +47,8 @@ class ProgressiveUpsamplingModel(tf.keras.models.Model):
                                                 use_bias=True,
                                                 dilation_rate=1,
                                                 activation="relu",
-                                                kernel_initializer=None,
-                                                bias_initializer=None)
+                                                kernel_initializer=tf.keras.initializers.he_uniform(),
+                                                bias_initializer=tf.keras.initializers.Zeros())
         self.conv_fu = tf.keras.layers.Conv2DTranspose(filters=input_shape[-1],
                                                        kernel_size=4,
                                                        strides=2,  # upsample by 2x
@@ -57,8 +57,8 @@ class ProgressiveUpsamplingModel(tf.keras.models.Model):
                                                        dilation_rate=1,
                                                        activation="relu",
                                                        use_bias=True,
-                                                       kernel_initializer=None,
-                                                       bias_initializer=None)
+                                                       kernel_initializer=tf.keras.initializers.he_uniform(),
+                                                       bias_initializer=tf.keras.initializers.Zeros())
         self.conv_res = tf.keras.layers.Conv2D(filters=input_shape[-1],
                                                kernel_size=3,
                                                strides=1,
@@ -67,8 +67,8 @@ class ProgressiveUpsamplingModel(tf.keras.models.Model):
                                                use_bias=True,
                                                dilation_rate=1,
                                                activation="relu",
-                                               kernel_initializer=None,
-                                               bias_initializer=None)
+                                               kernel_initializer=tf.keras.initializers.he_uniform(),
+                                               bias_initializer=tf.keras.initializers.Zeros())
         self.conv_up = tf.keras.layers.Conv2DTranspose(filters=input_shape[-1],
                                                        kernel_size=4,
                                                        strides=2,  # upsample by 2x
@@ -77,8 +77,8 @@ class ProgressiveUpsamplingModel(tf.keras.models.Model):
                                                        dilation_rate=1,
                                                        activation="relu",
                                                        use_bias=True,
-                                                       kernel_initializer=None,
-                                                       bias_initializer=None)
+                                                       kernel_initializer=tf.keras.initializers.he_uniform(),
+                                                       bias_initializer=tf.keras.initializers.Zeros())
 
     @tf.function
     def feature_extraction(self, inputs):
