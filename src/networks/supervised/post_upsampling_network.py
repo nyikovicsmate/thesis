@@ -5,7 +5,7 @@ import contextlib
 from src.config import *
 from src.dataset import Dataset
 from src.networks.network import Network
-from src.models.supervised import PostUpsamplingModel
+from src.models.supervised.post_upsampling_model import PostUpsamplingModel
 
 
 class PostUpsamplingNetwork(Network):
@@ -32,7 +32,7 @@ class PostUpsamplingNetwork(Network):
         optimizer.apply_gradients(zip(grads, self.model.trainable_variables))
         return tf.reduce_sum(loss)
 
-    def train(self, dataset_x, dataset_y, loss_func, epochs, learning_rate):
+    def train(self, dataset_x, dataset_y, loss_func, epochs, learning_rate, callback=None):
         learning_rate = tf.keras.optimizers.schedules.ExponentialDecay(initial_learning_rate=learning_rate,
                                                                        decay_steps=epochs,
                                                                        decay_rate=0.9,
@@ -80,6 +80,5 @@ class PostUpsamplingNetwork(Network):
                     e_idx += 1
                     train_loss = 0
                     start_sec = time.time()
-                    if e_idx > 0 and (e_idx + 1) % 100 == 0:
-                        LOGGER.info(f"Saving state after {e_idx + 1} epochs.")
-                        self.save_state()
+                    if callback is not None:
+                        callback(self)
