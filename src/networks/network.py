@@ -12,6 +12,7 @@ from src.dataset import Dataset
 
 
 class Network(ABC):
+    _CHECKPOINTS_DIR = "checkpoints"
 
     def __init__(self,
                  model: tf.keras.models.Model):
@@ -62,19 +63,23 @@ class Network(ABC):
         dir_name = str.lower(self.__class__.__name__) + appendix
         self._saved_state = copy.deepcopy(self._current_state)
         # make sure the save directory exists
-        checkpoint_dir_path = ROOT_PATH.joinpath("checkpoints")
+        checkpoint_dir_path = ROOT_PATH.joinpath(Network._CHECKPOINTS_DIR)
         if not checkpoint_dir_path.exists() or not checkpoint_dir_path.is_dir():
-            LOGGER.warning(f"Save directory {checkpoint_dir_path} does not exist. Creating it.")
+            LOGGER.warning(f"Checkpoints directory {checkpoint_dir_path} does not exist. Creating it.")
             checkpoint_dir_path.mkdir(parents=False, exist_ok=False)
-        # save the keras model to Tensorflow SavedModel format
+        # save the layer's weights and optimizer state to Tensorflow SavedModel format
         model_dir_path = checkpoint_dir_path.joinpath(dir_name)
-        self.model.save(filepath=str(model_dir_path), overwrite=True, include_optimizer=True, save_format="tf")
-        # also save the state of the model
+        if not model_dir_path.exists() or not checkpoint_dir_path.is_dir():
+            LOGGER.warning(f"Model directory {model_dir_path} does not exist. Creating it.")
+            model_dir_path.mkdir(parents=False, exist_ok=False)
+        self.model.save_weights(filepath=str(model_dir_path.joinpath("weights")), overwrite=True, save_format="tf")
+        # save the state of the model
         state_file_path = model_dir_path.joinpath("state.dat")
         with open(str(state_file_path), "wb") as f:
             pickle.dump(self.state, f)
         # update the saved state status
         self._saved_state = copy.deepcopy(self._current_state)
+        LOGGER.info("Saved state.")
 
     def load_state(self, appendix: str = "",):
         """Load a previously saved model.
@@ -94,20 +99,20 @@ class Network(ABC):
             """
         dir_name = str.lower(self.__class__.__name__) + appendix
         # make sure the save directory exists
-        checkpoint_dir_path = ROOT_PATH.joinpath("checkpoints")
-        if not checkpoint_dir_path.exists() or not checkpoint_dir_path.is_dir():
-            raise FileExistsError(
-                f"Save directory {checkpoint_dir_path} does not exist. Couldn't find any checkpoints.")
-        # load the keras model from Tensorflow SavedModel format
+        checkpoint_dir_path = ROOT_PATH.joinpath(Network._CHECKPOINTS_DIR)
         model_dir_path = checkpoint_dir_path.joinpath(dir_name)
-        self.model = tf.keras.models.load_model(filepath=str(model_dir_path))
+        if not model_dir_path.exists() or not model_dir_path.is_dir():
+            raise FileExistsError(
+                    f"Model directory {model_dir_path} does not exist. Couldn't find any checkpoints.")
+        # load the layer's weights from Tensorflow SavedModel format
+        self.model.load_weights(filepath=str(model_dir_path.joinpath("weights")))
         # also load the previous state of the model
         state_file_path = model_dir_path.joinpath("state.dat")
         with open(str(state_file_path), "rb") as f:
             self._current_state = pickle.load(f)
         # update the saved state status
         self._saved_state = copy.deepcopy(self._current_state)
-        LOGGER.info(f"Loaded model with: {chr(10)}{self.state}")
+        LOGGER.info(f"Loaded state with: {chr(10)}{self.state}")
 
     @abstractmethod
     def train(self,
