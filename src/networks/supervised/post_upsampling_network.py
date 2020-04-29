@@ -52,10 +52,10 @@ class PostUpsamplingNetwork(Network):
             e_idx = 0
             train_loss = 0
             start_sec = time.time()
+            random_y_idx = 0
             while e_idx < epochs:
                 # process a batch
                 try:
-                    random_y_idx = np.random.randint(len(dataset_y))
                     x = iter_x.next()
                     for idx in range(len(iter_y)):
                         if idx == random_y_idx:
@@ -80,5 +80,6 @@ class PostUpsamplingNetwork(Network):
                     e_idx += 1
                     train_loss = 0
                     start_sec = time.time()
+                    random_y_idx = np.random.randint(len(dataset_y))
                     if callback is not None:
                         callback(self)
