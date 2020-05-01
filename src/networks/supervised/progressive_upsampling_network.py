@@ -29,7 +29,7 @@ class ProgressiveUpsamplingNetwork(Network):
         loss = 0
         for y, yl in zip(y_list, yl_list):
             N = tf.constant(len(y), dtype=tf.float32)
-            loss += (ProgressiveUpsamplingNetwork._charbonnier_loss(tf.subtract(y, yl)) / N)
+            loss += tf.reduce_sum(ProgressiveUpsamplingNetwork._charbonnier_loss(tf.subtract(y, yl))) / N
         return loss
 
     def predict(self, x: np.ndarray, *args, **kwargs) -> np.ndarray:
@@ -47,7 +47,7 @@ class ProgressiveUpsamplingNetwork(Network):
             loss = ProgressiveUpsamplingNetwork.custom_loss((y, y_pred,))
             grads = tape.gradient(loss, self.model.trainable_variables)
         optimizer.apply_gradients(zip(grads, self.model.trainable_variables))
-        return tf.reduce_sum(loss)
+        return loss
 
     def train(self, dataset_x, dataset_y, loss_func, epochs, learning_rate, callback=None):
         learning_rate = tf.keras.optimizers.schedules.ExponentialDecay(initial_learning_rate=learning_rate,
