@@ -19,13 +19,14 @@ class IterativeSamplingModel(tf.keras.models.Model):
         self.up_3 = self.UpBlock(filters=filters, kernel_size=kernel_size, strides=strides, stage_num=2)
         self.down_3 = self.DownBlock(filters=filters, kernel_size=kernel_size, strides=strides, stage_num=3)
         self.up_4 = self.UpBlock(filters=filters, kernel_size=kernel_size, strides=strides, stage_num=3)
-        # self.down_4 = self.DownBlock(filters=filters, kernel_size=kernel_size, strides=strides, stage_num=4)
-        # self.up_5 = self.UpBlock(filters=filters, kernel_size=kernel_size, strides=strides, stage_num=4)
+        self.down_4 = self.DownBlock(filters=filters, kernel_size=kernel_size, strides=strides, stage_num=4)
+        self.up_5 = self.UpBlock(filters=filters, kernel_size=kernel_size, strides=strides, stage_num=4)
         self.reconst = self.ReconstructionBlock(input_shape=input_shape)
 
-    class FeatureExtractionBlock:
+    class FeatureExtractionBlock(tf.keras.models.Model):
 
         def __init__(self, input_shape):
+            super().__init__()
             self.conv_0 = tf.keras.layers.Conv2D(input_shape=input_shape,
                                                  filters=256,
                                                  kernel_size=3,
@@ -49,14 +50,15 @@ class IterativeSamplingModel(tf.keras.models.Model):
                                                  bias_initializer=tf.keras.initializers.Zeros())
 
         @tf.function
-        def __call__(self, inputs):
+        def call(self, inputs):
             x = self.conv_0(inputs)
             x = self.conv_1(x)
             return x
 
-    class UpBlock:
+    class UpBlock(tf.keras.models.Model):
 
         def __init__(self, filters, kernel_size, strides, stage_num=0):
+            super().__init__()
             self._stage_num = stage_num
             if self._stage_num != 0:
                 self.conv_stage = tf.keras.layers.Conv2D(filters=filters,
@@ -101,7 +103,7 @@ class IterativeSamplingModel(tf.keras.models.Model):
                                                             bias_initializer=tf.keras.initializers.Zeros())
 
         @tf.function
-        def __call__(self, inputs):
+        def call(self, inputs):
             if self._stage_num != 0:
                 inputs = self.conv_stage(inputs)
             h0 = self.deconv_0(inputs)
@@ -110,9 +112,10 @@ class IterativeSamplingModel(tf.keras.models.Model):
             h1 = self.deconv_1(res)
             return h0 + h1
 
-    class DownBlock:
+    class DownBlock(tf.keras.models.Model):
 
         def __init__(self, filters, kernel_size, strides, stage_num=0):
+            super().__init__()
             self._stage_num = stage_num
             if self._stage_num != 0:
                 self.conv_stage = tf.keras.layers.Conv2D(filters=filters,
@@ -157,7 +160,7 @@ class IterativeSamplingModel(tf.keras.models.Model):
                                                  bias_initializer=tf.keras.initializers.Zeros())
 
         @tf.function
-        def __call__(self, inputs):
+        def call(self, inputs):
             if self._stage_num != 0:
                 inputs = self.conv_stage(inputs)
             l0 = self.conv_0(inputs)
@@ -166,9 +169,10 @@ class IterativeSamplingModel(tf.keras.models.Model):
             l1 = self.conv_1(res)
             return l0 + l1
 
-    class ReconstructionBlock:
+    class ReconstructionBlock(tf.keras.models.Model):
 
         def __init__(self, input_shape):
+            super().__init__()
             self.conv_0 = tf.keras.layers.Conv2D(filters=input_shape[-1],
                                                  kernel_size=3,
                                                  strides=1,
@@ -181,7 +185,7 @@ class IterativeSamplingModel(tf.keras.models.Model):
                                                  bias_initializer=tf.keras.initializers.Zeros())
 
         @tf.function
-        def __call__(self, inputs):
+        def call(self, inputs):
             x = self.conv_0(inputs)
             return x
 
@@ -205,11 +209,11 @@ class IterativeSamplingModel(tf.keras.models.Model):
         concat_l = tf.concat((l, concat_l), axis=3)
         h = self.up_4(concat_l)
 
-        # concat_h = tf.concat((h, concat_h), axis=3)
-        # l = self.down_4(concat_h)
-        #
-        # concat_l = tf.concat((l, concat_l), axis=3)
-        # h = self.up_5(concat_l)
+        concat_h = tf.concat((h, concat_h), axis=3)
+        l = self.down_4(concat_h)
+
+        concat_l = tf.concat((l, concat_l), axis=3)
+        h = self.up_5(concat_l)
 
         concat_h = tf.concat((h, concat_h), axis=3)
         x = self.reconst(concat_h)
