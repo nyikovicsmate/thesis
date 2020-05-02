@@ -1,0 +1,4 @@
+tensorflow>=2.1
+numpy>=1.18
+h5py>=2.10
+
