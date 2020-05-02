@@ -34,11 +34,12 @@ class ProgressiveUpsamplingNetwork(Network):
 
     def predict(self, x: np.ndarray, *args, **kwargs) -> np.ndarray:
         size = self._parse_predict_optionals(x, args, kwargs)
-        y_pred = self.model(x)
-        # TODO return image batch specified by input arguments, as of now it constantly returns 2x images
-        y_pred = y_pred[0].numpy()
-        LOGGER.info(f"Predicted images with shape: {y_pred.shape}")
-        return y_pred
+        y_pred_list = self.model(x)
+        for y_pred in y_pred_list:
+            if tuple(y_pred.shape[1:3]) == size:
+                LOGGER.info(f"Predicted images with shape: {y_pred.shape}")
+                return y_pred.numpy()
+        LOGGER.warn(f"Couldn't predict.")
 
     @tf.function
     def _train_step(self, x, y, optimizer):
