@@ -1,12 +1,12 @@
 import copy
 import pickle
 from abc import ABC, abstractmethod
-from typing import Callable, List, Union, Tuple
+from typing import Callable, List, Union, Tuple, Optional
 
 import numpy as np
 import tensorflow as tf
 
-from src.callbacks import TrainingCheckpointCallback
+from src.callbacks import Callback
 from src.config import LOGGER, ROOT_PATH
 from src.dataset import Dataset
 
@@ -120,8 +120,8 @@ class Network(ABC):
               dataset_y: Union[Dataset, List[Dataset]],
               loss_func: Callable[[np.ndarray, np.ndarray], float],
               epochs: int,
-              learning_rate: float,
-              callback: TrainingCheckpointCallback = None):
+              learning_rate: float = 0.001,
+              callbacks: Optional[List[Callback]] = None):   # currently only specific callback is supported
         pass
 
     @abstractmethod

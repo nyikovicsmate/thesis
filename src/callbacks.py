@@ -1,24 +1,166 @@
-from abc import ABC, abstractmethod
-from typing import Callable
+from abc import ABCMeta
 
 from src.config import LOGGER
 
 
-class Callback(ABC, Callable):
+class Callback(metaclass=ABCMeta):
 
-    @abstractmethod
-    def __init__(self):
-        pass
-
-    @abstractmethod
-    def __call__(self, env):
+    def call(self, inst):
         """
-        :param env: the environment, the callback is working with (usually a class instance).
+        Callbacks are callable.
+        :param inst: a `Network` class instance the callback is working with.
         """
-        pass
+        raise NotImplementedError(f"`{self.__class__.__name__}.call(self, inst)` not implemented.")
+
+    def __call__(self, inst):
+        return self.call(inst)
 
 
-class TrainingCheckpointCallback(Callback):
+class OptimizerCallback(Callback, metaclass=ABCMeta):
+    """
+    Special type of callbacks intended to be used with optimizers.
+    DOES NOT WORK IN TENSORFLOW 2.1.0 or 2.2.0 with @tf.function decorators
+    https://github.com/tensorflow/tensorflow/issues/31323
+
+    Workaround:
+        Wrap the `learning_rate` parameter inside a `tf.Variable()` object,
+        and update the variable manually by calling `learning_rate.assign(new_value)`.
+
+        OR
+
+        Get rid of all @tf.function decorators.
+    """
+    # def __call__(self, inst):
+    #     self._inst = inst
+    #
+    #     def wrapper():
+    #         """
+    #         According to https://github.com/tensorflow/tensorflow/blob/e5bf8de410005de06a7ff5393fafdf832ef1d4ad/tensorflow/python/keras/optimizer_v2/adam.py#L129
+    #         tensorflow optimizers in eager mode take a no-parameter callable. This function therefore
+    #         is the one, that actually gets called. It's purpose is to wrap/preserve the given instance reference.
+    #         """
+    #         return self.call(self._inst)
+    #
+    #     return wrapper
+
+
+class TrainIterationEndCallback(Callback, metaclass=ABCMeta):
+    """
+    Special type of callbacks intended to be called at the end of a training iteration/step.
+    """
+    pass
+
+
+class ExponentialDecayCallback(OptimizerCallback):
+
+    def __init__(self, initial_learning_rate: float, decay_steps: int, decay_rate: float, staircase=False):
+        """
+        Produces a decayed learning rate when passed the current optimizer step.
+        This can be useful for changing the learning rate value across different
+        invocations of optimizer functions. It is computed as:
+
+        ```python
+        def decayed_learning_rate(step):
+            return initial_learning_rate * decay_rate ^ (step / decay_steps)
+        ```
+
+        If the argument `staircase` is `True`, then `step / decay_steps` is
+        an integer division and the decayed learning rate follows a
+        staircase function.
+
+        Arguments:
+            initial_learning_rate: A scalar. The initial learning rate.
+            decay_steps: A scalar. Must be positive. See the decay computation above.
+            decay_rate: A scalar. The decay rate.
+            staircase: Boolean.  If `True` decay the learning rate at discrete intervals
+        """
+        self._initial_learning_rate = initial_learning_rate
+        self._decay_rate = decay_rate
+        self._decay_steps = decay_steps
+        self._staircase = staircase
+
+    # noinspection PyProtectedMember
+    def call(self, inst):
+        return self.decayed_learning_rate(inst._current_state.epochs)
+
+    def decayed_learning_rate(self, step):
+        if self._staircase:
+            return self._initial_learning_rate * self._decay_rate ** (step // self._decay_steps)
+        else:
+            return self._initial_learning_rate * self._decay_rate ** (step / self._decay_steps)
+
+
+class DecayLrOnPlateauCallback(OptimizerCallback):
+
+    def __init__(self,
+                 initial_learning_rate: float,
+                 monitor: str = "train_loss",
+                 factor: float = 0.1,
+                 patience: int = 10,
+                 mode: str = "min",
+                 min_delta: float = 1e-4,
+                 min_learning_rate: float=0):
+
+        """
+        Reduce learning rate when a metric has stopped improving.
+        Models often benefit from reducing the learning rate by a factor
+        of 2-10 once learning stagnates. This callback monitors a
+        quantity and if no improvement is seen for a 'patience' number
+        of epochs, the learning rate is reduced.
+
+        Arguments:
+            initial_learning_rate: A scalar. The initial learning rate.
+            monitor: quantity to be monitored.
+            factor: factor by which the learning rate will be reduced. new_lr = lr * factor
+            patience: number of epochs with no improvement after which learning rate
+            will be reduced.
+            mode: one of {min, max}. In `min` mode, lr will be reduced when the
+            quantity monitored has stopped decreasing, in `max` mode it will be
+            reduced when the quantity monitored has stopped increasing.
+            min_delta: threshold for measuring the new optimum, to only focus on
+            significant changes.
+            min_learning_rate: lower bound on the learning rate.
+        """
+        self._learning_rate = initial_learning_rate
+        self._monitor = monitor
+        self._factor = factor
+        self._patience = patience
+        self._mode = mode
+        self._min_delta = min_delta
+        self._min_learning_rate = min_learning_rate
+        self._current_patience = 0
+        self._reference_value = None
+
+    # noinspection PyProtectedMember
+    def call(self, inst):
+        # validate parameters
+        assert self._monitor in inst._current_state.__dict__.keys(), f"Monitored quantity `{self._monitor}` is not a NetworkState attribute."
+        assert self._mode in ["min", "max"]
+
+        if self._reference_value is None:
+            self._reference_value = inst._current_state.__dict__[self._monitor]
+
+        if (self._mode == "min" and inst._current_state.__dict__[self._monitor] > self._reference_value + self._min_delta) or \
+            (self._mode == "max" and inst._current_state.__dict__[self._monitor] < self._reference_value - self._min_delta):
+            self._current_patience += 1
+        else:
+            self._reference_value = inst._current_state.__dict__[self._monitor]
+            self._current_patience = 0
+
+        if self._current_patience >= self._patience:
+            # check whether there is still room for reduction
+            LOGGER.info(f"`{self._monitor}` did not {'increase' if self._mode == 'max' else 'decrease'} for {self._patience} epochs.")
+            if self._learning_rate > self._min_learning_rate + 1e-10:
+                self._learning_rate *= self._factor
+                self._current_patience = 0
+                self._reference_value = inst._current_state.__dict__[self._monitor]
+                LOGGER.info(f"Reducing learning rate to {self._learning_rate}")
+            else:
+                LOGGER.info(f"Learning rate is already at minimum value.")
+        return self._learning_rate
+
+
+class TrainingCheckpointCallback(TrainIterationEndCallback):
 
     def __init__(self,
                  appendix: str = "",
@@ -26,22 +168,23 @@ class TrainingCheckpointCallback(Callback):
                  monitor: str = "train_loss",
                  mode: str = "min",
                  save_freq: int = 10):
-        """Callback for saving the model after `save_freq` number of epochs.
-            `appendix` can contain any valid string, that will be appended to the default directory name
-            when saving the model. For example: if `appendix` is `model_1`, and the network type is
-            `PreUpsamplingNetwork` then the model checkpoints will be saved under
-            "./checkpoints/preupsamplingnetwork_model_1" directory.
-            Arguments:
-                appendix: string, to append to the directory name (default: "").
-                save_best_only: if `save_best_only=True`, the latest best model according
-                monitor: quantity to monitor, a NetworkState attribute (default: train_loss).
-                mode: one of {min, max}. If `save_best_only=True`, the decision to
-                    overwrite the current save file is made based on either the maximization
-                    or the minimization of the monitored quantity. For `val_acc`, this
-                    should be `max`, for `val_loss` this should be `min`, etc.
-                save_freq: number of epochs between each checkpoint (default: 10).
+        """
+        Callback for saving the model after `save_freq` number of epochs.
+        `appendix` can contain any valid string, that will be appended to the default directory name
+        when saving the model. For example: if `appendix` is `model_1`, and the network type is
+        `PreUpsamplingNetwork` then the model checkpoints will be saved under
+        "./checkpoints/preupsamplingnetwork_model_1" directory.
+
+        Arguments:
+            appendix: string, to append to the directory name (default: "").
+            save_best_only: if `save_best_only=True`, the latest best model according
+            monitor: quantity to monitor, a NetworkState attribute (default: train_loss).
+            mode: one of {min, max}. If `save_best_only=True`, the decision to
+                overwrite the current save file is made based on either the maximization
+                or the minimization of the monitored quantity. For `val_acc`, this
+                should be `max`, for `val_loss` this should be `min`, etc.
+            save_freq: number of epochs between each checkpoint (default: 10).
             """
-        super().__init__()
         self._appendix = appendix
         self._save_best_only = save_best_only
         self._monitor = monitor
@@ -49,27 +192,24 @@ class TrainingCheckpointCallback(Callback):
         self._save_freq = save_freq
 
     # noinspection PyProtectedMember
-    def __call__(self, env):
-        """
-        :param env: the environment, the callback is working with (usually a class instance).
-        """
+    def call(self, inst):
         # don't save the model if it's not time yet
-        if env._current_state.epochs <= 0 or env._current_state.epochs % self._save_freq != 0:
+        if inst._current_state.epochs <= 0 or inst._current_state.epochs % self._save_freq != 0:
             return
         # validate parameters
-        assert self._monitor in env._current_state.__dict__.keys(), f"Monitored quantity `{self._monitor}` is not a NetworkState attribute."
+        assert self._monitor in inst._current_state.__dict__.keys(), f"Monitored quantity `{self._monitor}` is not a NetworkState attribute."
         assert self._mode in ["min", "max"]
         # don't save the model either if it doesn't meet the requirements
         if self._save_best_only is True:
-            if env._saved_state is not None:
-                if self._mode == "min" and env._current_state.__dict__[self._monitor] >= env._saved_state.__dict__[self._monitor]:
+            if inst._saved_state is not None:
+                if self._mode == "min" and inst._current_state.__dict__[self._monitor] >= inst._saved_state.__dict__[self._monitor]:
                     LOGGER.info(f"Skipping saving. `{self._monitor}` current >= best : "
-                                f"[{env._current_state.__dict__[self._monitor]:.4f}] >= [{env._saved_state.__dict__[self._monitor]:.4f}]")
+                                f"[{inst._current_state.__dict__[self._monitor]:.4f}] >= [{inst._saved_state.__dict__[self._monitor]:.4f}]")
                     return
-                elif self._mode == "max" and env._current_state.__dict__[self._monitor] <= env._saved_state.__dict__[self._monitor]:
+                elif self._mode == "max" and inst._current_state.__dict__[self._monitor] <= inst._saved_state.__dict__[self._monitor]:
                     LOGGER.info(f"Skipping saving. `{self._monitor}` current <= best : "
-                                f"[{env._current_state.__dict__[self._monitor]:.4f}] <= [{env._saved_state.__dict__[self._monitor]:.4f}]")
+                                f"[{inst._current_state.__dict__[self._monitor]:.4f}] <= [{inst._saved_state.__dict__[self._monitor]:.4f}]")
                     return
         # checks passed, save the model
-        LOGGER.info(f"Saving state after {env._current_state.epochs} epochs.")
-        env.save_state(self._appendix)
+        LOGGER.info(f"Saving state after {inst._current_state.epochs} epochs.")
+        inst.save_state(self._appendix)
