@@ -20,8 +20,8 @@ class ProgressiveUpsamplingNetwork(Network):
     @staticmethod
     @tf.function
     def _charbonnier_loss(x: tf.Tensor):
-        epsilon = tf.constant(1e-3, dtype=tf.float32)
-        return tf.sqrt(tf.add(tf.square(x), tf.square(epsilon)))
+        epsilon_square = tf.square(tf.constant(1e-4, dtype=tf.float32))
+        return tf.sqrt(tf.square(x) + epsilon_square)
 
     @staticmethod
     @tf.function
@@ -30,7 +30,7 @@ class ProgressiveUpsamplingNetwork(Network):
         loss = 0
         for y, yl in zip(y_list, yl_list):
             N = tf.constant(len(y), dtype=tf.float32)
-            loss += tf.reduce_sum(ProgressiveUpsamplingNetwork._charbonnier_loss(tf.subtract(y, yl))) / N
+            loss += tf.reduce_sum(ProgressiveUpsamplingNetwork._charbonnier_loss(y - yl)) / N
         return loss
 
     def predict(self, x: np.ndarray, *args, **kwargs) -> np.ndarray:
