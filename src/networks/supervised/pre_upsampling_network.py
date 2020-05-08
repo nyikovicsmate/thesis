@@ -25,6 +25,7 @@ class PreUpsamplingNetwork(Network):
 
     @tf.function
     def _train_step(self, x, y, optimizer, loss_func):
+        y = tf.convert_to_tensor(y)
         with tf.GradientTape() as tape:
             _shape = tf.shape(y)  # expecting 4D tensor in channel_last format
             x = tf.image.resize(x, (_shape[1], _shape[2]), tf.image.ResizeMethod.BICUBIC)
@@ -36,7 +37,7 @@ class PreUpsamplingNetwork(Network):
 
     def train(self, dataset_x, dataset_y, loss_func, epochs, learning_rate=0.001, callbacks=None):
         learning_rate = tf.Variable(learning_rate)      # wrap variable according to callbacks.py:25
-        optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
+        optimizer = tf.keras.optimizers.SGD(learning_rate=learning_rate)
         # threat a single value as a list regardless
         if isinstance(dataset_y, Dataset):
             dataset_y = [dataset_y]
