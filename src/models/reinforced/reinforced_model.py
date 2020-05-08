@@ -1,16 +1,17 @@
-import tensorflow as tf
 from typing import Tuple
+
+import tensorflow as tf
 
 
 # noinspection DuplicatedCode
-class PixelwiseA3CModel(tf.keras.models.Model):
+class ReinforcedModel(tf.keras.models.Model):
+    """PixelwiseA3CModel"""
 
     def __init__(self,
-                 batch_size: int,
-                 input_shape: Tuple[int, int, int]):
+                 input_shape: Tuple[int, int, int] = (None, None, 1)):
         super().__init__()
-        self.inputs = tf.keras.layers.InputLayer(input_shape=input_shape, batch_size=batch_size, dtype=tf.float32)
-        self.conv1 = tf.keras.layers.Conv2D(filters=64,
+        self.conv1 = tf.keras.layers.Conv2D(input_shape=input_shape,
+                                            filters=64,
                                             kernel_size=3,
                                             strides=1,
                                             padding="same",
@@ -18,8 +19,8 @@ class PixelwiseA3CModel(tf.keras.models.Model):
                                             use_bias=True,
                                             dilation_rate=1,  # no dilation
                                             activation="relu",
-                                            kernel_initializer=None,
-                                            bias_initializer=None)
+                                            kernel_initializer=tf.keras.initializers.he_uniform(),
+                                            bias_initializer=tf.keras.initializers.Zeros())
         self.diconv2 = tf.keras.layers.Conv2D(filters=64,
                                               kernel_size=3,
                                               strides=1,
@@ -28,8 +29,8 @@ class PixelwiseA3CModel(tf.keras.models.Model):
                                               use_bias=True,
                                               dilation_rate=2,
                                               activation="relu",
-                                              kernel_initializer=None,
-                                              bias_initializer=None)
+                                              kernel_initializer=tf.keras.initializers.he_uniform(),
+                                              bias_initializer=tf.keras.initializers.Zeros())
         self.diconv3 = tf.keras.layers.Conv2D(filters=64,
                                               kernel_size=3,
                                               strides=1,
@@ -38,8 +39,8 @@ class PixelwiseA3CModel(tf.keras.models.Model):
                                               use_bias=True,
                                               dilation_rate=3,
                                               activation="relu",
-                                              kernel_initializer=None,
-                                              bias_initializer=None)
+                                              kernel_initializer=tf.keras.initializers.he_uniform(),
+                                              bias_initializer=tf.keras.initializers.Zeros())
         self.diconv4 = tf.keras.layers.Conv2D(filters=64,
                                               kernel_size=3,
                                               strides=1,
@@ -48,8 +49,8 @@ class PixelwiseA3CModel(tf.keras.models.Model):
                                               use_bias=True,
                                               dilation_rate=4,
                                               activation="relu",
-                                              kernel_initializer=None,
-                                              bias_initializer=None)
+                                              kernel_initializer=tf.keras.initializers.he_uniform(),
+                                              bias_initializer=tf.keras.initializers.Zeros())
         self.actor_diconv5 = tf.keras.layers.Conv2D(filters=64,
                                                     kernel_size=3,
                                                     strides=1,
@@ -58,8 +59,8 @@ class PixelwiseA3CModel(tf.keras.models.Model):
                                                     use_bias=True,
                                                     dilation_rate=3,
                                                     activation="relu",
-                                                    kernel_initializer=None,
-                                                    bias_initializer=None)
+                                                    kernel_initializer=tf.keras.initializers.he_uniform(),
+                                                    bias_initializer=tf.keras.initializers.Zeros())
         self.actor_diconv6 = tf.keras.layers.Conv2D(filters=64,
                                                     kernel_size=3,
                                                     strides=1,
@@ -68,8 +69,8 @@ class PixelwiseA3CModel(tf.keras.models.Model):
                                                     use_bias=True,
                                                     dilation_rate=2,
                                                     activation="relu",
-                                                    kernel_initializer=None,
-                                                    bias_initializer=None)
+                                                    kernel_initializer=tf.keras.initializers.he_uniform(),
+                                                    bias_initializer=tf.keras.initializers.Zeros())
         self.actor_conv7 = tf.keras.layers.Conv2D(filters=9,  # number of actions
                                                   kernel_size=3,
                                                   strides=1,
@@ -78,8 +79,8 @@ class PixelwiseA3CModel(tf.keras.models.Model):
                                                   use_bias=True,
                                                   dilation_rate=1,
                                                   activation="softmax",
-                                                  kernel_initializer=None,
-                                                  bias_initializer=None)
+                                                  kernel_initializer=tf.keras.initializers.he_uniform(),
+                                                  bias_initializer=tf.keras.initializers.Zeros())
         self.critic_diconv5 = tf.keras.layers.Conv2D(filters=64,
                                                      kernel_size=3,
                                                      strides=1,
@@ -88,8 +89,8 @@ class PixelwiseA3CModel(tf.keras.models.Model):
                                                      use_bias=True,
                                                      dilation_rate=3,
                                                      activation="relu",
-                                                     kernel_initializer=None,
-                                                     bias_initializer=None)
+                                                     kernel_initializer=tf.keras.initializers.he_uniform(),
+                                                     bias_initializer=tf.keras.initializers.Zeros())
         self.critic_diconv6 = tf.keras.layers.Conv2D(filters=64,
                                                      kernel_size=3,
                                                      strides=1,
@@ -98,8 +99,8 @@ class PixelwiseA3CModel(tf.keras.models.Model):
                                                      use_bias=True,
                                                      dilation_rate=2,
                                                      activation="relu",
-                                                     kernel_initializer=None,
-                                                     bias_initializer=None)
+                                                     kernel_initializer=tf.keras.initializers.he_uniform(),
+                                                     bias_initializer=tf.keras.initializers.Zeros())
         self.critic_conv7 = tf.keras.layers.Conv2D(filters=1,
                                                    kernel_size=3,
                                                    strides=1,
@@ -108,20 +109,19 @@ class PixelwiseA3CModel(tf.keras.models.Model):
                                                    use_bias=True,
                                                    dilation_rate=1,
                                                    activation="linear",
-                                                   kernel_initializer=None,
-                                                   bias_initializer=None)
+                                                   kernel_initializer=tf.keras.initializers.he_uniform(),
+                                                   bias_initializer=tf.keras.initializers.Zeros())
 
     @tf.function
     def call(self, inputs, training=None, mask=None):
-        x = self.inputs(inputs)
-        x = self.conv1(x)
+        x = self.conv1(inputs)
         x = self.diconv2(x)
         x = self.diconv3(x)
         x = self.diconv4(x)
         actor = self.actor_diconv5(x)
         actor = self.actor_diconv6(actor)
-        actor = self.actor_conv7(actor)  # output shape (batch_size, 9, width, height)
+        actor = self.actor_conv7(actor)  # output shape (batch_size, width, height, 9)
         critic = self.critic_diconv5(x)
         critic = self.critic_diconv6(critic)
-        critic = self.critic_conv7(critic)  # output shape (batch_size, 1, width, height)
+        critic = self.critic_conv7(critic)  # output shape (batch_size, width, height, 1)
         return actor, critic
