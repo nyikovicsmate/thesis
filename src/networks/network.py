@@ -148,8 +148,8 @@ class Network(ABC):
         :return: The determined upsampling shape as a (height, width) tuple.
         """
         default_upsampling_factor = 2
-        assert 3 <= len(x.shape) <= 4, "`x` should be a (batch, height, width, depth) or (height, width, depth) shaped array."
-        x_size = (x.shape[1], x.shape[2]) if len(x.shape) == 4 else (x.shape[0], x.shape[1])
+        assert len(x.shape) == 4, "`x` should be a (batch, height, width, depth) shaped array."
+        x_size = (x.shape[1], x.shape[2])
         size = (int(x_size[0] * default_upsampling_factor), int(x_size[1] * default_upsampling_factor))   # the default size
         params = [] + list(args) + list(kwargs.values())
         if len(params) == 0:
