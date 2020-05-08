@@ -233,8 +233,6 @@ class HDFDataset(Dataset):
     def map(self, map_func) -> "HDFDataset":
         if not callable(map_func):
             raise TypeError("'func' must be callable.")
-        # vectorize the function to make it able to be used on np arrays later
-        map_func = np.vectorize(map_func)
         _copy = copy.copy(self)
         _copy._iter.map_funcs += [map_func]
         return _copy
