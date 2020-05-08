@@ -1,12 +1,12 @@
 import copy
 import pickle
 from abc import ABC, abstractmethod
-from typing import Callable, List, Union, Tuple
+from typing import Callable, List, Union, Tuple, Optional
 
 import numpy as np
 import tensorflow as tf
 
-from src.callbacks import TrainingCheckpointCallback
+from src.callbacks import Callback
 from src.config import LOGGER, ROOT_PATH
 from src.dataset import Dataset
 
@@ -120,8 +120,8 @@ class Network(ABC):
               dataset_y: Union[Dataset, List[Dataset]],
               loss_func: Callable[[np.ndarray, np.ndarray], float],
               epochs: int,
-              learning_rate: float,
-              callback: TrainingCheckpointCallback = None):
+              learning_rate: float = 0.001,
+              callbacks: Optional[List[Callback]] = None):   # currently only specific callback is supported
         pass
 
     @abstractmethod
@@ -148,8 +148,8 @@ class Network(ABC):
         :return: The determined upsampling shape as a (height, width) tuple.
         """
         default_upsampling_factor = 2
-        assert 3 <= len(x.shape) <= 4, "`x` should be a (batch, height, width, depth) or (height, width, depth) shaped array."
-        x_size = (x.shape[1], x.shape[2]) if len(x.shape) == 4 else (x.shape[0], x.shape[1])
+        assert len(x.shape) == 4, "`x` should be a (batch, height, width, depth) shaped array."
+        x_size = (x.shape[1], x.shape[2])
         size = (int(x_size[0] * default_upsampling_factor), int(x_size[1] * default_upsampling_factor))   # the default size
         params = [] + list(args) + list(kwargs.values())
         if len(params) == 0:

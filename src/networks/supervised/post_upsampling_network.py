@@ -4,6 +4,7 @@ import contextlib
 
 from src.config import *
 from src.dataset import Dataset
+from src.callbacks import OptimizerCallback, TrainIterationEndCallback
 from src.networks.network import Network
 from src.models.supervised.post_upsampling_model import PostUpsamplingModel
 
@@ -15,29 +16,26 @@ class PostUpsamplingNetwork(Network):
         super().__init__(model)
 
     def predict(self, x: np.ndarray, *args, **kwargs) -> np.ndarray:
-        size = self._parse_predict_optionals(x, args, kwargs)
+        # as of now only constant 2x upsampling is supported
+        # TODO: Implement transfer learning for quickly re-trainig the last deconv layer for diff upsampling rates
+        # size = self._parse_predict_optionals(x, args, kwargs)
         y_pred = self.model(x)
-        y_pred = tf.image.resize(y_pred, size, tf.image.ResizeMethod.BICUBIC).numpy()
         LOGGER.info(f"Predicted images with shape: {y_pred.shape}")
         return y_pred
 
     @tf.function
     def _train_step(self, x, y, optimizer, loss_func):
+        y = tf.convert_to_tensor(y)
         with tf.GradientTape() as tape:
             y_pred = self.model(x)
-            _shape = tf.shape(y)  # expecting 4D tensor in channel_last format
-            y_pred = tf.image.resize(y_pred, (_shape[1], _shape[2]), tf.image.ResizeMethod.BICUBIC)
             loss = loss_func(y, y_pred)
             grads = tape.gradient(loss, self.model.trainable_variables)
         optimizer.apply_gradients(zip(grads, self.model.trainable_variables))
         return tf.reduce_sum(loss)
 
-    def train(self, dataset_x, dataset_y, loss_func, epochs, learning_rate, callback=None):
-        learning_rate = tf.keras.optimizers.schedules.ExponentialDecay(initial_learning_rate=learning_rate,
-                                                                       decay_steps=epochs,
-                                                                       decay_rate=0.9,
-                                                                       staircase=True)
-        optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
+    def train(self, dataset_x, dataset_y, loss_func, epochs, learning_rate=0.001, callbacks=None):
+        learning_rate = tf.Variable(learning_rate)      # wrap variable according to callbacks.py:25
+        optimizer = tf.keras.optimizers.SGD(learning_rate=learning_rate)
         # threat a single value as a list regardless
         if isinstance(dataset_y, Dataset):
             dataset_y = [dataset_y]
@@ -81,5 +79,9 @@ class PostUpsamplingNetwork(Network):
                     train_loss = 0
                     start_sec = time.time()
                     random_y_idx = np.random.randint(len(dataset_y))
-                    if callback is not None:
-                        callback(self)
+                    # manually update learning rate and call iteration end callbacks
+                    for cb in callbacks:
+                        if isinstance(cb, OptimizerCallback):
+                            learning_rate.assign(cb(self))
+                        if isinstance(cb, TrainIterationEndCallback):
+                            cb(self)

@@ -101,11 +101,14 @@ network = PreUpsamplingNetwork()
 network.load_state()
 
 img = cv2.imread(<path to your image>, cv2.IMREAD_GRAYSCALE)
-img = np.array([img])   # get the 4D shaped image numpy array
-pred = network.predict(img, 4)  # upsample the image by 4x
+img = cv2.resize(img, (35, 35), cv2.INTER_CUBIC)    # network works with 35x35 images
+img = img[np.newaxis, :, :, np.newaxis]   # get the 4D shaped image numpy array
+img = img / 255.0	# normalize image
+pred = network.predict(img, 2)  # upsample the image by 2x
+pred = pred * 255.0   # revert normalization
 
 # display the image
-cv2.imshow("4x image", pred[0])     # pred is also a 4D array, we want to display the first (and only) image
+cv2.imshow("2x image", pred[0].astype(np.uint8))     # pred is also a 4D array, we want to display the first (and only) image
 cv2.waitKey()
 ```
 
