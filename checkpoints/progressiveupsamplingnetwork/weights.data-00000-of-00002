@@ -1,65 +1,56 @@
-êP{∆≠
-b
+√	Ü˚Ç
+S
 conv_in
 	conv_fe_1
 	conv_fe_2
-	conv_fe_3
-conv_fu
-conv_res
-conv_up
+conv_fu
+conv_res
+conv_up
 
 
-kernel
-	bias
+kernel
+bias
 
 
-
-kernel
-bias
+	kernel
+
+bias
 
 
-kernel
-bias
+kernel
+bias
 
 
-kernel
-bias
+kernel
+bias
 
 
-kernel
-bias
+kernel
+bias
 
 
-kernel
-bias
-
-
-kernel
-bias
-OM
-VARIABLE_VALUEconv2d_10/kernel)conv_in/kernel/.ATTRIBUTES/VARIABLE_VALUE
-KI
-VARIABLE_VALUEconv2d_10/bias'conv_in/bias/.ATTRIBUTES/VARIABLE_VALUE
+kernel
+bias
+NL
+VARIABLE_VALUEconv2d_8/kernel)conv_in/kernel/.ATTRIBUTES/VARIABLE_VALUE
+JH
+VARIABLE_VALUEconv2d_8/bias'conv_in/bias/.ATTRIBUTES/VARIABLE_VALUE
+PN
+VARIABLE_VALUEconv2d_9/kernel+conv_fe_1/kernel/.ATTRIBUTES/VARIABLE_VALUE
+LJ
+VARIABLE_VALUEconv2d_9/bias)conv_fe_1/bias/.ATTRIBUTES/VARIABLE_VALUE
 QO
-VARIABLE_VALUEconv2d_11/kernel+conv_fe_1/kernel/.ATTRIBUTES/VARIABLE_VALUE
+VARIABLE_VALUEconv2d_10/kernel+conv_fe_2/kernel/.ATTRIBUTES/VARIABLE_VALUE
 MK
-VARIABLE_VALUEconv2d_11/bias)conv_fe_1/bias/.ATTRIBUTES/VARIABLE_VALUE
-QO
-VARIABLE_VALUEconv2d_12/kernel+conv_fe_2/kernel/.ATTRIBUTES/VARIABLE_VALUE
-MK
-VARIABLE_VALUEconv2d_12/bias)conv_fe_2/bias/.ATTRIBUTES/VARIABLE_VALUE
-QO
-VARIABLE_VALUEconv2d_13/kernel+conv_fe_3/kernel/.ATTRIBUTES/VARIABLE_VALUE
-MK
-VARIABLE_VALUEconv2d_13/bias)conv_fe_3/bias/.ATTRIBUTES/VARIABLE_VALUE
+VARIABLE_VALUEconv2d_10/bias)conv_fe_2/bias/.ATTRIBUTES/VARIABLE_VALUE
 XV
 VARIABLE_VALUEconv2d_transpose_4/kernel)conv_fu/kernel/.ATTRIBUTES/VARIABLE_VALUE
 TR
 VARIABLE_VALUEconv2d_transpose_4/bias'conv_fu/bias/.ATTRIBUTES/VARIABLE_VALUE
 PN
-VARIABLE_VALUEconv2d_14/kernel*conv_res/kernel/.ATTRIBUTES/VARIABLE_VALUE
+VARIABLE_VALUEconv2d_11/kernel*conv_res/kernel/.ATTRIBUTES/VARIABLE_VALUE
 LJ
-VARIABLE_VALUEconv2d_14/bias(conv_res/bias/.ATTRIBUTES/VARIABLE_VALUE
+VARIABLE_VALUEconv2d_11/bias(conv_res/bias/.ATTRIBUTES/VARIABLE_VALUE
 XV
 VARIABLE_VALUEconv2d_transpose_5/kernel)conv_up/kernel/.ATTRIBUTES/VARIABLE_VALUE
 TR
