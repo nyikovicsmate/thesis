@@ -20,23 +20,29 @@ class ReinforcedNetwork(Network):
 
     def predict(self, x: np.ndarray, steps_per_episode: int = 5, *args, **kwargs) -> np.ndarray:
         size = self._parse_predict_optionals(x, args, kwargs)  # keep it for the logs
-        s_t0 = x
+        s_t0 = tf.convert_to_tensor(x)
         for t in range(steps_per_episode):
-            # image_batch_nchw = tf.transpose(s_t0, perm=[0, 2, 3, 1])
             # predict the actions and values
             a_t, _ = self.model(s_t0)
             # sample the actions
             sampled_a_t = self._sample_most_probable(a_t)
+            # TODO: Eliminate this back-and-forth conversion nonsense by converting State.update() function from NCHW to NHWC (channel first to channel last).
+            # convert to NCHW
+            s_t0_nchw = tf.transpose(s_t0, perm=[0, 3, 1, 2])
+            sampled_a_t_nchw = tf.transpose(sampled_a_t, perm=[0, 3, 1, 2])
             # update the current state/image with the predicted actions
-            s_t1 = State.update(s_t0, sampled_a_t.numpy())
+            s_t1 = tf.convert_to_tensor(State.update(s_t0_nchw.numpy(), sampled_a_t_nchw.numpy()), dtype=tf.float32)
+            # convert the back to NHWC
+            s_t1 = tf.transpose(s_t1, perm=[0, 2, 3, 1])
             s_t0 = s_t1
         LOGGER.info(f"Predicted images with shape: {s_t0.shape}")
         return s_t0
 
     # @tf.function
+    # TODO: Make it tf.function decorator ready
     def _train_step(self, x, y, optimizer, steps_per_episode: int = 5, discount_factor: float = 0.95):
         s_t0 = tf.convert_to_tensor(x)
-        y = tf.transpose(tf.convert_to_tensor(y), perm=[0, 2, 3, 1])
+        y = tf.convert_to_tensor(y)
         episode_r = 0
         r = {}  # reward
         V = {}  # expected total rewards from state
@@ -44,26 +50,28 @@ class ReinforcedNetwork(Network):
         past_action_entropy = {}
         with tf.GradientTape() as tape:
             for t in range(steps_per_episode):
-                # image_batch_nchw = tf.transpose(s_t0, perm=[0, 2, 3, 1])
                 # predict the actions and values
                 a_t, V_t = self.model(s_t0)
                 # sample the actions
                 sampled_a_t = self._sample_random(a_t)
                 # clip distribution into range to avoid 0 values, which cause problem with calculating logarithm
                 a_t = tf.clip_by_value(a_t, 1e-6, 1)
-                # convert to NCHW
-                a_t = tf.transpose(a_t, perm=[0, 3, 1, 2])
-                V_t = tf.transpose(V_t, perm=[0, 3, 1, 2])
-
-                past_action_log_prob[t] = self._mylog_prob(tf.math.log(a_t), sampled_a_t)
-                past_action_entropy[t] = self._myentropy(a_t, tf.math.log(a_t))
+                a_t_log = tf.math.log(a_t)
+                past_action_log_prob[t] = self._mylog_prob(a_t_log, sampled_a_t)
+                past_action_entropy[t] = self._myentropy(a_t, a_t_log)
                 V[t] = V_t
+                # TODO: Eliminate this back-and-forth conversion nonsense by converting State.update() function from NCHW to NHWC (channel first to channel last).
+                # convert to NCHW
+                s_t0_nchw = tf.transpose(s_t0, perm=[0, 3, 1, 2])
+                sampled_a_t_nchw = tf.transpose(sampled_a_t, perm=[0, 3, 1, 2])
                 # update the current state/image with the predicted actions
-                s_t1 = tf.convert_to_tensor(State.update(s_t0.numpy(), sampled_a_t.numpy()), dtype=tf.float32)
+                s_t1 = tf.convert_to_tensor(State.update(s_t0_nchw.numpy(), sampled_a_t_nchw.numpy()), dtype=tf.float32)
+                # convert the back to NHWC
+                s_t1 = tf.transpose(s_t1, perm=[0, 2, 3, 1])
                 r_t = self._mse(y, s_t0, s_t1)
                 r[t] = tf.cast(r_t, dtype=tf.float32)
                 s_t0 = s_t1
-                episode_r += np.mean(r_t) * np.power(discount_factor, t)
+                episode_r += tf.reduce_mean(r_t) * tf.math.pow(discount_factor, t)
 
             R = 0
             actor_loss = 0
@@ -148,24 +156,22 @@ class ReinforcedNetwork(Network):
     @staticmethod
     @tf.function
     def _myentropy(prob, log_prob):
-        return tf.stack([- tf.math.reduce_sum(prob * log_prob, axis=1)], axis=1)
+        return tf.stack([- tf.math.reduce_sum(prob * log_prob, axis=3)], axis=3)
 
     @staticmethod
     @tf.function
     def _mylog_prob(data, indexes):
         """
         Selects elements from a multidimensional array.
-        :param data: image_batch
-        :param indexes: indices to select
-        :return: the selected indices from data eg.: data=[[11, 2], [3, 4]] indexes=[0,1] --> [11, 4]
+        :param data: The 4D actions vector with logarithmic values.
+        :param indexes: The indexes to select.
+        :return: The selected indices from data eg.: data=[[11, 2], [3, 4]], indexes=[[0],[1]] --> [[11], [4]]
         """
-        n_batch, n_actions, h, w = data.shape
-        p_trans = tf.transpose(data, perm=[0, 2, 3, 1])
-        p_trans = tf.reshape(p_trans, [-1, n_actions])
-        indexes_flat = tf.reshape(indexes, [-1])
-        one_hot_mask = tf.one_hot(indexes_flat, p_trans.shape[1], on_value=True, off_value=False, dtype=tf.bool)
-        output = tf.boolean_mask(p_trans, one_hot_mask)
-        return tf.reshape(output, (n_batch, 1, h, w))
+        data_flat = tf.reshape(data, (-1, data.shape[-1]))
+        indexes_flat = tf.reshape(indexes, (-1,))
+        one_hot_mask = tf.one_hot(indexes_flat, data_flat.shape[-1], on_value=True, off_value=False, dtype=tf.bool)
+        output = tf.boolean_mask(data_flat, one_hot_mask)
+        return tf.reshape(output, (*data.shape[0:-1], 1))
 
     # @staticmethod
     # @tf.function
@@ -191,28 +197,25 @@ class ReinforcedNetwork(Network):
     def _sample_random(distribution):
         """
         Samples the image action distribution returned by the last softmax activation.
-        :param distribution: output of a softmax activated layer, an array with probability distributions,
-        usually shaped (batch_size, channels, widht, height, number_of_actions) NCHW!
-        :return: array shaped of (batch_size, channels, widht, height)
-        # TODO: Fix shapes, this supposed to be nhwc
+        :param distribution: A 4D array with probability distributions shaped (batch_size, height, width, samples)
+        :return: The sampled 4D vector shaped of (batch_size, height, width, 1)
         """
         d = tf.reshape(distribution, (-1, distribution.shape[-1]))
         d = tf.math.log(d)
-        d = tf.random.categorical(d, num_samples=1)
-        d = tf.reshape(d, distribution.shape[0:-1])
+        d = tf.random.categorical(logits=d, num_samples=1)  # draw samples from the categorical distribution
+        d = tf.reshape(d, (*distribution.shape[0:-1], 1))
         return d
 
     @staticmethod
     @tf.function
     def _sample_most_probable(distribution):
         """
-        Returns the most probable action index based on the distribution returned by the last softmax activation.
-        :param distribution: output of a softmax activated layer, an array with probability distributions,
-        usually shaped (batch_size, channels, widht, height, number_of_actions) NCHW!
-        :return: array shaped of (batch_size, channels, widht, height)
-        # TODO: Fix shapes, this supposed to be nhwc
+        Samples the image action distribution returned by the last softmax activation by returning the
+        most probable action indexes from samples.
+        :param distribution: A 4D array with probability distributions shaped (batch_size, height, width, samples)
+        :return: The sampled 4D vector shaped of (batch_size, height, width, 1)
         """
         d = tf.reshape(distribution, (-1, distribution.shape[-1]))
         d = tf.argmax(d, axis=1)
-        d = tf.reshape(d, distribution.shape[0:-1])
+        d = tf.reshape(d, (*distribution.shape[0:-1], 1))
         return d

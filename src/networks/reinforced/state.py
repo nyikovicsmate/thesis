@@ -25,7 +25,7 @@ class State:
         neutral = (State.MOVE_RANGE - 1) / 2
         move = actions_batch.astype(np.float32)
         move = (move - neutral) / 255
-        moved_image = image_batch_copy + move[:, np.newaxis, :, :]
+        moved_image = image_batch_copy + move
         gaussian = np.zeros(image_batch_copy.shape, image_batch_copy.dtype)
         gaussian2 = np.zeros(image_batch_copy.shape, image_batch_copy.dtype)
         bilateral = np.zeros(image_batch_copy.shape, image_batch_copy.dtype)
@@ -48,17 +48,17 @@ class State:
                 box[i, 0] = cv2.boxFilter(image_batch_copy[i, 0], ddepth=-1, ksize=(5, 5))
 
         image_batch_copy = moved_image
-        image_batch_copy = np.where(actions_batch[:, np.newaxis, :, :] == State.MOVE_RANGE, gaussian,
+        image_batch_copy = np.where(actions_batch == State.MOVE_RANGE, gaussian,
                                     image_batch_copy)
-        image_batch_copy = np.where(actions_batch[:, np.newaxis, :, :] == State.MOVE_RANGE + 1, bilateral,
+        image_batch_copy = np.where(actions_batch == State.MOVE_RANGE + 1, bilateral,
                                     image_batch_copy)
-        image_batch_copy = np.where(actions_batch[:, np.newaxis, :, :] == State.MOVE_RANGE + 2, median,
+        image_batch_copy = np.where(actions_batch == State.MOVE_RANGE + 2, median,
                                     image_batch_copy)
-        image_batch_copy = np.where(actions_batch[:, np.newaxis, :, :] == State.MOVE_RANGE + 3, gaussian2,
+        image_batch_copy = np.where(actions_batch == State.MOVE_RANGE + 3, gaussian2,
                                     image_batch_copy)
-        image_batch_copy = np.where(actions_batch[:, np.newaxis, :, :] == State.MOVE_RANGE + 4, bilateral2,
+        image_batch_copy = np.where(actions_batch == State.MOVE_RANGE + 4, bilateral2,
                                     image_batch_copy)
-        image_batch_copy = np.where(actions_batch[:, np.newaxis, :, :] == State.MOVE_RANGE + 5, box,
+        image_batch_copy = np.where(actions_batch == State.MOVE_RANGE + 5, box,
                                     image_batch_copy)
 
         return image_batch_copy
