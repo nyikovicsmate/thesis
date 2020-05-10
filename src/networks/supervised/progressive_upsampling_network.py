@@ -53,7 +53,10 @@ class ProgressiveUpsamplingNetwork(Network):
 
     def train(self, dataset_x, dataset_y, loss_func, epochs, learning_rate=0.001, callbacks=None):
         learning_rate = tf.Variable(learning_rate)      # wrap variable according to callbacks.py:25
-        optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
+        optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate,
+                                             beta_1=0.9,
+                                             beta_2=0.999,
+                                             epsilon=1e-8)
         # threat a single value as a list regardless
         if isinstance(dataset_y, Dataset):
             dataset_y = [dataset_y]
