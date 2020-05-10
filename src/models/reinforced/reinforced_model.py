@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Tuple, Optional
 
 import tensorflow as tf
 
@@ -7,9 +7,9 @@ import tensorflow as tf
 class ReinforcedModel(tf.keras.models.Model):
     """PixelwiseA3CModel"""
 
-    def __init__(self,
-                 input_shape: Tuple[int, int, int] = (None, None, 1)):
+    def __init__(self):
         super().__init__()
+        input_shape = (None, None, 1)
         self.conv1 = tf.keras.layers.Conv2D(input_shape=input_shape,
                                             filters=64,
                                             kernel_size=3,
