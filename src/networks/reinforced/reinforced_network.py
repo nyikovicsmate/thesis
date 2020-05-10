@@ -22,23 +22,26 @@ class ReinforcedNetwork(Network):
 
     def predict(self, x: np.ndarray, steps_per_episode: int = 5, *args, **kwargs) -> np.ndarray:
         size = self._parse_predict_optionals(x, args, kwargs)  # keep it for the logs
-        s_t0 = tf.convert_to_tensor(x)
-        for t in range(steps_per_episode):
-            # predict the actions and values
-            a_t, _ = self.model(s_t0)
-            # sample the actions
-            sampled_a_t = self._sample_most_probable(a_t)
-            # TODO: Eliminate this back-and-forth conversion nonsense by converting State.update() function from NCHW to NHWC (channel first to channel last).
-            # convert to NCHW
-            s_t0_nchw = tf.transpose(s_t0, perm=[0, 3, 1, 2])
-            sampled_a_t_nchw = tf.transpose(sampled_a_t, perm=[0, 3, 1, 2])
-            # update the current state/image with the predicted actions
-            s_t1 = tf.convert_to_tensor(State.update(s_t0_nchw.numpy(), sampled_a_t_nchw.numpy()), dtype=tf.float32)
-            # convert the back to NHWC
-            s_t1 = tf.transpose(s_t1, perm=[0, 2, 3, 1])
-            s_t0 = s_t1
-        LOGGER.info(f"Predicted images with shape: {s_t0.shape}")
-        return s_t0
+        s_t0_channels = tf.split(tf.convert_to_tensor(x), num_or_size_splits=x.shape[-1], axis=3)
+        result = None
+        for s_t0 in s_t0_channels:
+            for t in range(steps_per_episode):
+                # predict the actions and values
+                a_t, _ = self.model(s_t0)
+                # sample the actions
+                sampled_a_t = self._sample_most_probable(a_t)
+                # TODO: Eliminate this back-and-forth conversion nonsense by converting State.update() function from NCHW to NHWC (channel first to channel last).
+                # convert to NCHW
+                s_t0_nchw = tf.transpose(s_t0, perm=[0, 3, 1, 2])
+                sampled_a_t_nchw = tf.transpose(sampled_a_t, perm=[0, 3, 1, 2])
+                # update the current state/image with the predicted actions
+                s_t1 = tf.convert_to_tensor(State.update(s_t0_nchw.numpy(), sampled_a_t_nchw.numpy()), dtype=tf.float32)
+                # convert the back to NHWC
+                s_t1 = tf.transpose(s_t1, perm=[0, 2, 3, 1])
+                s_t0 = s_t1
+            result = s_t0 if result == None else tf.concat([result, s_t0], axis=3)
+        LOGGER.info(f"Predicted images with shape: {result.shape}")
+        return result.numpy()
 
     # @tf.function
     # TODO: Make it tf.function decorator ready
