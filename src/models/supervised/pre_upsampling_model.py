@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Tuple, Optional
 import tensorflow as tf
 
 
@@ -11,7 +11,7 @@ class PreUpsamplingModel(tf.keras.models.Model):
     """
 
     def __init__(self,
-                 input_shape: Tuple[int, int, int] = (None, None, 1)):    # (height, width, depth), arbitrary grayscale images as default
+                 input_shape: Tuple[Optional[int], Optional[int], Optional[int]]):
         super().__init__()
         self.conv_0 = tf.keras.layers.Conv2D(input_shape=input_shape,
                                              filters=64,  # optimum filter number (see TABLE 1)

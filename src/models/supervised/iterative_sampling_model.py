@@ -1,11 +1,11 @@
-from typing import Tuple
+from typing import Tuple, Optional
 import tensorflow as tf
 
 
 class IterativeSamplingModel(tf.keras.models.Model):
 
     def __init__(self,
-                 input_shape: Tuple[int, int, int] = (None, None, 1)):
+                 input_shape: Tuple[Optional[int], Optional[int], Optional[int]]):
         super().__init__()
         filters = 64
         kernel_size = 6

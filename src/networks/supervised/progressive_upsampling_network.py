@@ -1,5 +1,5 @@
 import contextlib
-from typing import Tuple, List
+from typing import Tuple, List, Optional
 
 import tensorflow as tf
 import numpy as np
@@ -13,8 +13,8 @@ from src.models.supervised.progressive_upsampling_model import ProgressiveUpsamp
 
 class ProgressiveUpsamplingNetwork(Network):
 
-    def __init__(self):
-        model = ProgressiveUpsamplingModel()  # increase the default scaling factor
+    def __init__(self, input_shape: Tuple[Optional[int], Optional[int], Optional[int]] = (None, None, 1)):
+        model = ProgressiveUpsamplingModel(input_shape=input_shape)
         super().__init__(model)
 
     @staticmethod

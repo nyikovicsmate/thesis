@@ -1,3 +1,5 @@
+from typing import Tuple, Optional
+
 import tensorflow as tf
 import numpy as np
 import contextlib
@@ -11,8 +13,8 @@ from src.models.supervised.post_upsampling_model import PostUpsamplingModel
 
 class PostUpsamplingNetwork(Network):
 
-    def __init__(self):
-        model = PostUpsamplingModel()
+    def __init__(self, input_shape: Tuple[Optional[int], Optional[int], Optional[int]] = (None, None, 1)):
+        model = PostUpsamplingModel(input_shape=input_shape)
         super().__init__(model)
 
     def predict(self, x: np.ndarray, *args, **kwargs) -> np.ndarray:

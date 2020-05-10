@@ -1,4 +1,5 @@
 import contextlib
+from typing import Tuple, Optional
 
 import tensorflow as tf
 import numpy as np
@@ -12,8 +13,8 @@ from src.models.supervised.iterative_sampling_model import IterativeSamplingMode
 
 class IterativeSamplingNetwork(Network):
 
-    def __init__(self):
-        model = IterativeSamplingModel()
+    def __init__(self, input_shape: Tuple[Optional[int], Optional[int], Optional[int]] = (None, None, 1)):
+        model = IterativeSamplingModel(input_shape=input_shape)
         super().__init__(model)
 
     def predict(self, x: np.ndarray, *args, **kwargs) -> np.ndarray:
