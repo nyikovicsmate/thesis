@@ -19,13 +19,15 @@ class ReinforcedNetwork(Network):
     def __init__(self):
         model = ReinforcedModel()
         super().__init__(model)
+        self._steps_per_episode = 5
+        self._discount_factor = 0.95
 
-    def predict(self, x: np.ndarray, steps_per_episode: int = 5, *args, **kwargs) -> np.ndarray:
+    def predict(self, x: np.ndarray, *args, **kwargs) -> np.ndarray:
         size = self._parse_predict_optionals(x, args, kwargs)  # keep it for the logs
         s_t0_channels = tf.split(tf.convert_to_tensor(x), num_or_size_splits=x.shape[-1], axis=3)
         result = None
         for s_t0 in s_t0_channels:
-            for t in range(steps_per_episode):
+            for t in range(self._steps_per_episode):
                 # predict the actions and values
                 a_t, _ = self.model(s_t0)
                 # sample the actions
@@ -45,7 +47,7 @@ class ReinforcedNetwork(Network):
 
     # @tf.function
     # TODO: Make it tf.function decorator ready
-    def _train_step(self, x, y, optimizer, steps_per_episode: int = 5, discount_factor: float = 0.95):
+    def _train_step(self, x, y, optimizer):
         s_t0 = tf.convert_to_tensor(x)
         y = tf.convert_to_tensor(y)
         episode_r = 0
@@ -54,7 +56,7 @@ class ReinforcedNetwork(Network):
         past_action_log_prob = {}
         past_action_entropy = {}
         with tf.GradientTape() as tape:
-            for t in range(steps_per_episode):
+            for t in range(self._steps_per_episode):
                 # predict the actions and values
                 a_t, V_t = self.model(s_t0)
                 # sample the actions
@@ -76,14 +78,14 @@ class ReinforcedNetwork(Network):
                 r_t = self._mse(y, s_t0, s_t1)
                 r[t] = tf.cast(r_t, dtype=tf.float32)
                 s_t0 = s_t1
-                episode_r += tf.reduce_mean(r_t) * tf.math.pow(discount_factor, t)
+                episode_r += tf.reduce_mean(r_t) * tf.math.pow(self._discount_factor, t)
 
             R = 0
             actor_loss = 0
             critic_loss = 0
             beta = 1e-2
-            for t in reversed(range(steps_per_episode)):
-                R *= discount_factor
+            for t in reversed(range(self._steps_per_episode)):
+                R *= self._discount_factor
                 R += r[t]
                 A = R - V[t]  # advantage
                 # Accumulate gradients of policy
