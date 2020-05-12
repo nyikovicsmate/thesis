@@ -200,8 +200,8 @@ class HDFDataset(Dataset):
                               "Are you missing a 'with' statement?")
         return self._file["images"]
 
-    def as_numpy_iterator(self) -> "HDFDataset.HDFDatasetIterator":
-        return self._iter
+    def as_numpy_iterator(self):
+        return iter(self)
 
     def batch(self, batch_size: int, drop_remainder: bool = False) -> "HDFDataset":
         _copy = copy.copy(self)
