@@ -19,7 +19,7 @@ class DiscriminatorModel(tf.keras.models.Model):
                                              kernel_initializer=tf.keras.initializers.RandomUniform(),
                                              bias_initializer=tf.keras.initializers.Zeros())
         self.act_0 = tf.keras.layers.ReLU()
-        self.bn_0 = tf.keras.layers.BatchNormalization()
+        # self.bn_0 = tf.keras.layers.BatchNormalization()
         self.conv_1 = tf.keras.layers.Conv2D(input_shape=input_shape,
                                              filters=64,
                                              kernel_size=3,
@@ -32,7 +32,7 @@ class DiscriminatorModel(tf.keras.models.Model):
                                              kernel_initializer=tf.keras.initializers.RandomUniform(),
                                              bias_initializer=tf.keras.initializers.Zeros())
         self.act_1 = tf.keras.layers.ReLU()
-        self.bn_1 = tf.keras.layers.BatchNormalization()
+        # self.bn_1 = tf.keras.layers.BatchNormalization()
         self.conv_2 = tf.keras.layers.Conv2D(input_shape=input_shape,
                                              filters=64,
                                              kernel_size=3,
@@ -48,22 +48,22 @@ class DiscriminatorModel(tf.keras.models.Model):
         self.bn_2 = tf.keras.layers.BatchNormalization()
         self.flatten = tf.keras.layers.Flatten()
         self.dense = tf.keras.layers.Dense(units=1)
-        self.softmax = tf.keras.layers.Softmax()
+        # self.softmax = tf.keras.layers.Softmax()
 
     # noinspection DuplicatedCode
     @tf.function
     def call(self, inputs, training=None, mask=None):
         x = self.conv_0(inputs)
         x = self.act_0(x)
-        x = self.bn_0(x)
+        # x = self.bn_0(x)
         x = self.conv_1(x)
         x = self.act_1(x)
-        x = self.bn_1(x)
+        # x = self.bn_1(x)
         x = self.conv_2(x)
         x = self.act_2(x)
         x = self.bn_2(x)
         x = self.flatten(x)
         x = self.dense(x)
-        x = self.softmax(x)
+        # x = self.softmax(x)
         return x
 
