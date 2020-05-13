@@ -16,19 +16,19 @@ class PreUpsampling:
         self.discriminator: Network = DiscriminatorNetwork(input_shape)
 
     def predict(self, x: tf.Tensor, *args, **kwargs):
-        return self.generator.predict(x, args, kwargs)
+        return self.generator.predict(x, *args, **kwargs)
 
     def discriminator_loss(self, y: tf.Tensor, y_pred: tf.Tensor):
-        epsilon = 1e-6
-        result = -tf.math.log(tf.clip_by_value(y, epsilon, 1)) - tf.math.log(
-            tf.constant(1, dtype=tf.float32) - tf.clip_by_value(y_pred, 0, 1 - epsilon))
+        epsilon = 1e-4
+        result = -tf.math.log(tf.clip_by_value(y, epsilon, 1-epsilon)) - tf.math.log(
+            tf.constant(1, dtype=tf.float32) - tf.clip_by_value(y_pred, epsilon, 1 - epsilon))
         return result
 
     def generator_loss(self, y: tf.Tensor, y_pred: tf.Tensor):
         w0 = tf.constant(0.5)
         w1 = tf.constant(0.05)
-        mse_loss = tf.reshape(w0 * tf.losses.mse(y, y_pred), shape=y.shape)
-        disc_loss = tf.expand_dims(tf.expand_dims(w1 * self.discriminator.predict(y_pred), axis=-1), axis=-1)
+        mse_loss = tf.reshape(w0 * tf.losses.mse(y, y_pred), shape=y.shape)     # aka. "content loss"
+        disc_loss = -w1 * tf.math.log(self.discriminator.predict(y_pred))       # aka. "adversarial loss"
         result = mse_loss + disc_loss  # disc_loss auto-broadcasted  (n,1,1,1) --> (n, h, w, c)
         return result
 
