@@ -13,23 +13,32 @@ class PreUpsampling:
 
     def __init__(self, input_shape: Tuple[Optional[int], Optional[int], Optional[int]] = (None, None, 1)):
         self.generator: Network = PreUpsamplingNetwork(input_shape)
+        self.generator.load_state()
         self.discriminator: Network = DiscriminatorNetwork(input_shape)
 
     def predict(self, x: tf.Tensor, *args, **kwargs):
         return self.generator.predict(x, *args, **kwargs)
 
     def discriminator_loss(self, y: tf.Tensor, y_pred: tf.Tensor):
-        epsilon = 1e-4
-        result = -tf.math.log(tf.clip_by_value(y, epsilon, 1-epsilon)) - tf.math.log(
-            tf.constant(1, dtype=tf.float32) - tf.clip_by_value(y_pred, epsilon, 1 - epsilon))
+        """
+        :param y: D(HR)
+        :param y_pred: D(G(LR))
+        :return:
+        """
+        result = -tf.math.log(y) - tf.math.log(tf.constant(1, dtype=tf.float32) - y_pred)
         return result
 
     def generator_loss(self, y: tf.Tensor, y_pred: tf.Tensor):
-        w0 = tf.constant(0.5)
-        w1 = tf.constant(0.05)
-        mse_loss = tf.reshape(w0 * tf.losses.mse(y, y_pred), shape=y.shape)     # aka. "content loss"
-        disc_loss = -w1 * tf.math.log(self.discriminator.predict(y_pred))       # aka. "adversarial loss"
-        result = mse_loss + disc_loss  # disc_loss auto-broadcasted  (n,1,1,1) --> (n, h, w, c)
+        """
+        :param y: HR
+        :param y_pred: G(LR)
+        :return:
+        """
+        w0 = tf.constant(0.5, dtype=tf.float32)
+        w1 = tf.constant(5, dtype=tf.float32)
+        mse_loss = tf.reduce_sum(w0 * tf.losses.mse(y, y_pred))    # aka. "content loss"
+        disc_loss = tf.reduce_sum(w1 * -tf.math.log(self.discriminator.predict(y_pred)))       # aka. "adversarial loss"
+        result = mse_loss + disc_loss
         return result
 
     def train(self,
@@ -46,14 +55,14 @@ class PreUpsampling:
         generator_stint = generator_epochs // alternating_ratio
         # alternate between training generator and discriminator
         while d_e < discriminator_epochs and g_e < generator_epochs:
-            if g_e < generator_epochs:
-                self.generator.train(x, y, self.generator_loss, generator_stint, generator_lr)
-                g_e += generator_stint
             if d_e < discriminator_epochs:
                 # TODO: work out a better way to iteratively pass the predicted data
                 with x:
                     LOGGER.setLevel(logging.WARNING)
                     x_list = [self.generator.predict(i) for i in x]
                     LOGGER.setLevel(logging.INFO)
-                self.discriminator.train(x_list, y, self.discriminator_loss, discriminator_stint, discriminator_lr)
+                self.discriminator.train(x_list, y, tf.losses.binary_crossentropy, discriminator_stint, discriminator_lr)
                 d_e += discriminator_stint
+            if g_e < generator_epochs:
+                self.generator.train(x, y, self.generator_loss, generator_stint, generator_lr)
+                g_e += generator_stint
