@@ -1,4 +1,5 @@
 import contextlib
+from itertools import zip_longest
 from typing import Tuple, List, Optional, Union, Iterable
 
 import tensorflow as tf
@@ -63,7 +64,7 @@ class ProgressiveUpsamplingNetwork(Network):
             train_loss = tf.constant(0, dtype=tf.float32)
             start_sec = time.time()
             # process a batch
-            for x_b, *y_b in zip(x, *y):
+            for x_b, *y_b in zip_longest(x, *y):
                 train_loss += self._train_step(x_b, y_b, optimizer)
             # update state
             delta_sec = time.time() - start_sec

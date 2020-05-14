@@ -1,3 +1,4 @@
+from itertools import zip_longest
 from typing import Tuple, Optional, Union
 
 import tensorflow as tf
@@ -49,7 +50,7 @@ class PostUpsamplingNetwork(Network):
             start_sec = time.time()
             # process a batch
             random_y_idx = 0 if len(y) == 1 else np.random.randint(len(y))
-            for x_b, y_b in zip(x, y[random_y_idx]):
+            for x_b, y_b in zip_longest(x, y[random_y_idx]):
                 train_loss += self._train_step(x_b, y_b, optimizer, loss_func)
             # update state
             delta_sec = time.time() - start_sec
