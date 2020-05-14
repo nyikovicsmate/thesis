@@ -7,7 +7,7 @@ class DiscriminatorModel(tf.keras.models.Model):
     def __init__(self,
                  input_shape: Tuple[Optional[int], Optional[int], Optional[int]]):
         super().__init__()
-        self.conv_0 = tf.keras.layers.Conv2D(input_shape=(70,70,1),
+        self.conv_0 = tf.keras.layers.Conv2D(input_shape=input_shape,
                                              filters=64,
                                              kernel_size=4,
                                              strides=2,
@@ -16,7 +16,7 @@ class DiscriminatorModel(tf.keras.models.Model):
                                              use_bias=True,
                                              dilation_rate=1,
                                              activation="linear",
-                                             kernel_initializer=tf.keras.initializers.RandomNormal(stddev=0.02),
+                                             kernel_initializer=tf.keras.initializers.RandomNormal(stddev=1),
                                              bias_initializer=tf.keras.initializers.Zeros())
         self.bn_0 = tf.keras.layers.BatchNormalization()
         self.act_0 = tf.keras.layers.LeakyReLU(alpha=0.2)
@@ -29,7 +29,7 @@ class DiscriminatorModel(tf.keras.models.Model):
                                              use_bias=True,
                                              dilation_rate=1,
                                              activation="linear",
-                                             kernel_initializer=tf.keras.initializers.RandomNormal(stddev=0.02),
+                                             kernel_initializer=tf.keras.initializers.RandomNormal(stddev=1),
                                              bias_initializer=tf.keras.initializers.Zeros())
         self.bn_1 = tf.keras.layers.BatchNormalization()
         self.act_1 = tf.keras.layers.LeakyReLU(alpha=0.2)
@@ -42,12 +42,13 @@ class DiscriminatorModel(tf.keras.models.Model):
                                              use_bias=True,
                                              dilation_rate=1,
                                              activation="linear",
-                                             kernel_initializer=tf.keras.initializers.RandomNormal(stddev=0.02),
+                                             kernel_initializer=tf.keras.initializers.RandomNormal(stddev=1),
                                              bias_initializer=tf.keras.initializers.Zeros())
         self.bn_2 = tf.keras.layers.BatchNormalization()
         self.act_2 = tf.keras.layers.LeakyReLU(alpha=0.2)
         self.flatten = tf.keras.layers.Flatten()
-        self.dense = tf.keras.layers.Dense(units=1)
+        self.dense = tf.keras.layers.Dense(units=1, activation="sigmoid")
+        # self.softmax = tf.keras.layers.Softmax(axis=0)  # axis parameter is important here
 
     # noinspection DuplicatedCode
     @tf.function
@@ -64,6 +65,5 @@ class DiscriminatorModel(tf.keras.models.Model):
         x = self.flatten(x)
         x = self.dense(x)
         # x = self.softmax(x)
-        # x = tf.exp(x) / tf.reduce_sum(tf.exp(x))    # softmax activation
         return x
 
