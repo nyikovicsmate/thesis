@@ -2,6 +2,7 @@ import copy
 from abc import ABC, abstractmethod
 from typing import Dict, List, Union, Callable, Tuple
 
+import cv2
 import h5py
 import numpy as np
 
@@ -27,25 +28,33 @@ class Dataset(ABC):
                                   f"Parameter given: {chr(10)} {path}")
 
     @abstractmethod
+    def __len__(self):
+        pass
+
+    @abstractmethod
+    def __getitem__(self, item):
+        pass
+
+    @abstractmethod
     def __iter__(self):
-        raise NotImplementedError()
+        pass
 
     @abstractmethod
     def __next__(self):
-        raise NotImplementedError()
+        pass
 
     @abstractmethod
     def __enter__(self):
-        raise NotImplementedError()
+        pass
 
     @abstractmethod
     def __exit__(self, exc_type, exc_val, exc_tb):
-        raise NotImplementedError()
+        pass
 
     @abstractmethod
     def as_numpy_iterator(self) -> "Dataset.DatasetIterator":
         """Returns an iterator which converts all elements of the dataset to numpy."""
-        raise NotImplementedError()
+        pass
 
     @abstractmethod
     def batch(self, batch_size: int, drop_remainder: bool = False) -> "Dataset":
@@ -67,7 +76,7 @@ class Dataset(ABC):
            Returns:
              Dataset: A `Dataset`.
            """
-        raise NotImplementedError()
+        pass
 
     @abstractmethod
     def repeat(self, count: int = 1) -> "Dataset":
@@ -80,7 +89,7 @@ class Dataset(ABC):
             Returns:
               Dataset: A `Dataset`.
             """
-        raise NotImplementedError()
+        pass
 
     @abstractmethod
     def shuffle(self, seed: int = None, reshuffle_each_iteration: bool = True) -> "Dataset":
@@ -95,7 +104,7 @@ class Dataset(ABC):
             Returns:
               Dataset: A `Dataset`.
             """
-        raise NotImplementedError()
+        pass
 
     @abstractmethod
     def split(self, ratio: Tuple, split_exactly: bool = False) -> List["Dataset"]:
@@ -114,7 +123,7 @@ class Dataset(ABC):
               Dataset: A list of `Dataset`-s. The actual number of datasets are determined by
               the `ratio` parameter.
             """
-        raise NotImplementedError()
+        pass
 
     @abstractmethod
     def map(self, map_func: Callable) -> "Dataset":
@@ -130,7 +139,7 @@ class Dataset(ABC):
             Returns:
               Dataset: A `Dataset`.
             """
-        raise NotImplementedError()
+        pass
 
     class DatasetIterator(ABC):
 
@@ -141,10 +150,6 @@ class Dataset(ABC):
         @abstractmethod
         def __next__(self):
             pass
-
-        def next(self) -> np.ndarray:
-            """Returns the next elements. #TODO: also raisese Stopiteration"""
-            return next(iter(self))
 
         @abstractmethod
         def advance(self):
@@ -157,6 +162,91 @@ class Dataset(ABC):
             pass
 
 
+class DirectoryDataset(Dataset):
+
+    def __init__(self, path: Union[str, pathlib.Path]):
+        super().__init__(path)
+        if not self._path.is_dir():
+            raise ValueError(f"{self._path} is not a directory.")
+        self._supported_extensions: List[str] = ["jpg", "png"]
+        self._image_paths = self._get_image_paths()
+        self._iter = self.DirectoryDatasetIterator(self)
+
+    def __len__(self):
+        return len(self._image_paths)
+
+    def __getitem__(self, item):
+        return DirectoryDataset._get_image(self._image_paths[item])
+
+    def __iter__(self):
+        return iter(self._iter)
+
+    def __next__(self):
+        return next(iter(self))
+
+    def __enter__(self):
+        # TODO: technically the image loading should happen here
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        # TODO: if `__enter__` loads the images, this should clear the reference
+        return False
+
+    def as_numpy_iterator(self) -> "Dataset.DatasetIterator":
+        raise NotImplementedError()
+
+    def batch(self, batch_size: int, drop_remainder: bool = False) -> "Dataset":
+        raise NotImplementedError()
+
+    def repeat(self, count: int = 1) -> "Dataset":
+        raise NotImplementedError()
+
+    def shuffle(self, seed: int = None, reshuffle_each_iteration: bool = True) -> "Dataset":
+        raise NotImplementedError()
+
+    def split(self, ratio: Tuple, split_exactly: bool = False) -> List["Dataset"]:
+        raise NotImplementedError()
+
+    def map(self, map_func: Callable) -> "Dataset":
+        raise NotImplementedError()
+
+    def _get_image_paths(self) -> List[pathlib.Path]:
+        """
+        Returns a list of absolute image paths found recursively starting from the scripts directory.
+        """
+        image_paths = []
+        for ext in self._supported_extensions:
+            image_paths.extend(list(self._path.rglob(f"*.{ext}")))
+        return image_paths
+
+    @staticmethod
+    def _get_image(path: Union[str, pathlib.Path]):
+        return cv2.imread(str(path), cv2.IMREAD_COLOR)
+
+    class DirectoryDatasetIterator(Dataset.DatasetIterator):
+
+        def __init__(self, dataset: "DirectoryDataset"):
+            self._dataset = dataset
+
+        def __iter__(self):
+            self.i = 0
+            return self
+
+        def __next__(self):
+            if self.i < len(self._dataset):
+                result = DirectoryDataset._get_image(self._dataset._image_paths[self.i])
+                self.i += 1
+                return result
+            else:
+                raise StopIteration()
+
+        def advance(self):
+            raise NotImplementedError()
+
+        def reset(self):
+            raise NotImplementedError()
+
+
 class HDFDataset(Dataset):
 
     def __init__(self, path: Union[str, pathlib.Path]):
@@ -165,6 +255,12 @@ class HDFDataset(Dataset):
             raise ValueError(f"{self._path} is not a valid hdf5 file.")
         self._file = None
         self._iter = self.HDFDatasetIterator(self)
+
+    def __len__(self):
+        return len(self._images_dataset)
+
+    def __getitem__(self, item):
+        return self._images_dataset[item]
 
     def __iter__(self):
         self._iter = copy.copy(self._iter)
@@ -259,7 +355,7 @@ class HDFDataset(Dataset):
             if self.indexes is None:
                 # try to get the length of the dataset
                 # if the dataset isn't used within a resource block the getter will throw a TypeError
-                _len = len(self._dataset._images_dataset)
+                _len = len(self._dataset)
                 if self._args["ratio"] is None:
                     self.indexes = np.arange(_len)
                 else:
