@@ -14,7 +14,7 @@ from src.models.adversarial.discriminator_model import DiscriminatorModel
 
 class DiscriminatorNetwork(Network):
 
-    def __init__(self, input_shape: Tuple[Optional[int], Optional[int], Optional[int]] = (None, None, 1)):
+    def __init__(self, input_shape: Tuple[Optional[int], Optional[int], Optional[int]] = (None, None, 3)):
         model = DiscriminatorModel(input_shape=input_shape)
         super().__init__(model)
         # workaround for tf.function decorator issue with multiple optimizer initializations, see https://github.com/tensorflow/tensorflow/issues/27120

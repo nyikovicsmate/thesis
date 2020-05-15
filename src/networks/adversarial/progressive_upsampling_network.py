@@ -4,14 +4,14 @@ import tensorflow as tf
 
 from src.networks.adversarial.adversarial_network import AdversarialNetwork
 from src.networks.adversarial.discriminator_network import DiscriminatorNetwork
-from src.networks.supervised.pre_upsampling_network import PreUpsamplingNetwork
+from src.networks.supervised.progressive_upsampling_network import ProgressiveUpsamplingNetwork
 
 
-class AdversarialPreUpsamplingNetwork(AdversarialNetwork):
+class AdversarialProgressiveUpsamplingNetwork(AdversarialNetwork):
 
     def __init__(self,
                  input_shape: Tuple[Optional[int], Optional[int], Optional[int]] = (None, None, 3)):
-        gen = PreUpsamplingNetwork(input_shape)
+        gen = ProgressiveUpsamplingNetwork(input_shape)
         gen.load_state()
         disc = DiscriminatorNetwork(input_shape)
         super().__init__(gen, disc)
