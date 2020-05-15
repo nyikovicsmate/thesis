@@ -28,6 +28,8 @@ hidered by the upsampling algorithm.
 
 ![results](https://raw.githubusercontent.com/nyikovicsmate/thesis/master/documentation/img/pre_r.png)
 
+PSNR=18.19
+
 ##### Post-upsampling model (FSRCNN)
 
 Reference: _[Accelerating the Super-Resolution Convolutional Neural Network](https://arxiv.org/abs/1608.00367) - Chao Dong, Chen Change Loy, Xiaoou Tang_
@@ -38,6 +40,8 @@ convolutional layers to extract features before they are potentionally lost. Fas
 still hidered by the upsampling.
 
 ![results](https://raw.githubusercontent.com/nyikovicsmate/thesis/master/documentation/img/post_r.png)
+
+PSNR=16.26
 
 ##### Progressive upsampling model (LapSRN)
 
@@ -55,6 +59,8 @@ features, especially for large (4x, 8x) scaling factors.
 
 ![results](https://raw.githubusercontent.com/nyikovicsmate/thesis/master/documentation/img/prog_r.png)
 
+PSNR=18.35
+
 ##### Iterative upsampling model (LapSRN)
 
 Reference: _[Deep Back-Projection Networks for Single Image Super-resolution](https://arxiv.org/abs/1904.05677) - Muhammad Haris, Greg Shakhnarovich, Norimichi Ukita_
@@ -65,6 +71,8 @@ feedback mechanism for projection errors.
 ![process](https://raw.githubusercontent.com/nyikovicsmate/thesis/master/documentation/img/iter0.png)
 
 ![results](https://raw.githubusercontent.com/nyikovicsmate/thesis/master/documentation/img/iter_r.png)
+
+PSNR=15.31 (doue to bug, should be around 27)
 
 #### Adversarial
 
@@ -82,9 +90,11 @@ An effective reinforcement learning model with pixel-wise rewards modified for u
 has an agent, and the agent changes the pixel value by taking an action. Therefore a policy is constructed which 
 strives for maximum reward.
 
-![process](https://raw.githubusercontent.com/nyikovicsmate/thesis/master/documentation/img/reinforced0.png)
+![process](https://raw.githubusercontent.com/nyikovicsmate/thesis/master/documentation/img/reinf0.png)
 
-![results](https://raw.githubusercontent.com/nyikovicsmate/thesis/master/documentation/img/reinforced0_r.png)
+![results](https://raw.githubusercontent.com/nyikovicsmate/thesis/master/documentation/img/reinf_r.png)
+
+PSNR=20.87
 
 ### How to use
 
