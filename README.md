@@ -76,8 +76,15 @@ TODO
 
 ---
 
-TODO     
+Reference: _[PixelRL: Fully Convolutional Network with Reinforcement Learning for Image Processing](https://arxiv.org/abs/1912.07190) - Ryosuke Furuta, Naoto Inoue, Toshihiko Yamasaki_    
 
+An effective reinforcement learning model with pixel-wise rewards modified for upsampling task. In pixelRL, each pixel 
+has an agent, and the agent changes the pixel value by taking an action. Therefore a policy is constructed which 
+strives for maximum reward.
+
+![process](https://raw.githubusercontent.com/nyikovicsmate/thesis/master/documentation/img/reinforced0.png)
+
+![results](https://raw.githubusercontent.com/nyikovicsmate/thesis/master/documentation/img/reinforced0_r.png)
 
 ### How to use
 
