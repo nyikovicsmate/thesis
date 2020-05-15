@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Tuple, Optional
 
 import tensorflow as tf
 
@@ -6,7 +6,7 @@ import tensorflow as tf
 class ProgressiveUpsamplingModel(tf.keras.models.Model):
 
     def __init__(self,
-                 input_shape: Tuple[int, int, int] = (None, None, 1)):
+                 input_shape: Tuple[Optional[int], Optional[int], Optional[int]]):
         super().__init__()
         self.conv_in = tf.keras.layers.Conv2D(input_shape=input_shape,
                                               filters=64,

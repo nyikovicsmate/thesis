@@ -79,9 +79,8 @@ class ExponentialDecayCallback(OptimizerCallback):
         self._decay_steps = decay_steps
         self._staircase = staircase
 
-    # noinspection PyProtectedMember
     def call(self, inst):
-        return self.decayed_learning_rate(inst._current_state.epochs)
+        return self.decayed_learning_rate(inst.state.epochs)
 
     def decayed_learning_rate(self, step):
         if self._staircase:
@@ -131,20 +130,19 @@ class DecayLrOnPlateauCallback(OptimizerCallback):
         self._current_patience = 0
         self._reference_value = None
 
-    # noinspection PyProtectedMember
     def call(self, inst):
         # validate parameters
-        assert self._monitor in inst._current_state.__dict__.keys(), f"Monitored quantity `{self._monitor}` is not a NetworkState attribute."
+        assert self._monitor in inst.state.__dict__.keys(), f"Monitored quantity `{self._monitor}` is not a NetworkState attribute."
         assert self._mode in ["min", "max"]
 
         if self._reference_value is None:
-            self._reference_value = inst._current_state.__dict__[self._monitor]
+            self._reference_value = inst.state.__dict__[self._monitor]
 
-        if (self._mode == "min" and inst._current_state.__dict__[self._monitor] > self._reference_value + self._min_delta) or \
-            (self._mode == "max" and inst._current_state.__dict__[self._monitor] < self._reference_value - self._min_delta):
+        if (self._mode == "min" and inst.state.__dict__[self._monitor] > self._reference_value + self._min_delta) or \
+            (self._mode == "max" and inst.state.__dict__[self._monitor] < self._reference_value - self._min_delta):
             self._current_patience += 1
         else:
-            self._reference_value = inst._current_state.__dict__[self._monitor]
+            self._reference_value = inst.state.__dict__[self._monitor]
             self._current_patience = 0
 
         if self._current_patience >= self._patience:
@@ -153,7 +151,7 @@ class DecayLrOnPlateauCallback(OptimizerCallback):
             if self._learning_rate > self._min_learning_rate + 1e-10:
                 self._learning_rate *= self._factor
                 self._current_patience = 0
-                self._reference_value = inst._current_state.__dict__[self._monitor]
+                self._reference_value = inst.state.__dict__[self._monitor]
                 LOGGER.info(f"Reducing learning rate to {self._learning_rate}")
             else:
                 LOGGER.info(f"Learning rate is already at minimum value.")
@@ -191,25 +189,24 @@ class TrainingCheckpointCallback(TrainIterationEndCallback):
         self._mode = mode
         self._save_freq = save_freq
 
-    # noinspection PyProtectedMember
     def call(self, inst):
         # don't save the model if it's not time yet
-        if inst._current_state.epochs <= 0 or inst._current_state.epochs % self._save_freq != 0:
+        if inst.state.epochs <= 0 or inst.state.epochs % self._save_freq != 0:
             return
         # validate parameters
-        assert self._monitor in inst._current_state.__dict__.keys(), f"Monitored quantity `{self._monitor}` is not a NetworkState attribute."
+        assert self._monitor in inst.state.__dict__.keys(), f"Monitored quantity `{self._monitor}` is not a NetworkState attribute."
         assert self._mode in ["min", "max"]
         # don't save the model either if it doesn't meet the requirements
         if self._save_best_only is True:
             if inst._saved_state is not None:
-                if self._mode == "min" and inst._current_state.__dict__[self._monitor] >= inst._saved_state.__dict__[self._monitor]:
+                if self._mode == "min" and inst.state.__dict__[self._monitor] >= inst._saved_state.__dict__[self._monitor]:
                     LOGGER.info(f"Skipping saving. `{self._monitor}` current >= best : "
-                                f"[{inst._current_state.__dict__[self._monitor]:.4f}] >= [{inst._saved_state.__dict__[self._monitor]:.4f}]")
+                                f"[{inst.state.__dict__[self._monitor]:.4f}] >= [{inst._saved_state.__dict__[self._monitor]:.4f}]")
                     return
-                elif self._mode == "max" and inst._current_state.__dict__[self._monitor] <= inst._saved_state.__dict__[self._monitor]:
+                elif self._mode == "max" and inst.state.__dict__[self._monitor] <= inst._saved_state.__dict__[self._monitor]:
                     LOGGER.info(f"Skipping saving. `{self._monitor}` current <= best : "
-                                f"[{inst._current_state.__dict__[self._monitor]:.4f}] <= [{inst._saved_state.__dict__[self._monitor]:.4f}]")
+                                f"[{inst.state.__dict__[self._monitor]:.4f}] <= [{inst._saved_state.__dict__[self._monitor]:.4f}]")
                     return
         # checks passed, save the model
-        LOGGER.info(f"Saving state after {inst._current_state.epochs} epochs.")
+        LOGGER.info(f"Saving state after {inst.state.epochs} epochs.")
         inst.save_state(self._appendix)

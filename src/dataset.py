@@ -200,8 +200,8 @@ class HDFDataset(Dataset):
                               "Are you missing a 'with' statement?")
         return self._file["images"]
 
-    def as_numpy_iterator(self) -> "HDFDataset.HDFDatasetIterator":
-        return self._iter
+    def as_numpy_iterator(self):
+        return iter(self)
 
     def batch(self, batch_size: int, drop_remainder: bool = False) -> "HDFDataset":
         _copy = copy.copy(self)
@@ -286,6 +286,8 @@ class HDFDataset(Dataset):
                 # recheck boundaries
                 if self.i >= len(self.indexes):
                     if self._args["shuffle"] and self._args["reshuffle_each_iteration"]:
+                        self._args["seed"] += 1
+                        np.random.seed(self._args["seed"])
                         np.random.shuffle(self.indexes)
                     if self._args["drop_remainder"] is True:
                         raise StopIteration()

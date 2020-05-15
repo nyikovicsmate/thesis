@@ -1,7 +1,8 @@
+import contextlib
 import copy
 import pickle
 from abc import ABC, abstractmethod
-from typing import Callable, List, Union, Tuple, Optional
+from typing import Callable, List, Union, Tuple, Optional, Iterable
 
 import numpy as np
 import tensorflow as tf
@@ -114,20 +115,37 @@ class Network(ABC):
         self._saved_state = copy.deepcopy(self._current_state)
         LOGGER.info(f"Loaded state with: {chr(10)}{self.state}")
 
-    @abstractmethod
     def train(self,
-              dataset_x: Dataset,
-              dataset_y: Union[Dataset, List[Dataset]],
-              loss_func: Callable[[np.ndarray, np.ndarray], float],
+              x: Iterable,
+              y: Union[Iterable, List[Iterable]],
+              loss_func: Callable[[tf.Tensor, tf.Tensor], tf.Tensor],
               epochs: int,
-              learning_rate: float = 0.001,
-              callbacks: Optional[List[Callback]] = None):   # currently only specific callback is supported
-        pass
+              learning_rate: float = 1e-4,
+              callbacks: Optional[List[Callback]] = None):
+        # wrap y in a list if necessary
+        if not isinstance(y, List):
+            y = [y]
+        with contextlib.ExitStack() as stack:
+            if isinstance(x, Dataset):
+                stack.enter_context(x)
+            for y_i in y:
+                if isinstance(y_i, Dataset):
+                   stack.enter_context(y_i)
+            self._train(x, y, loss_func, epochs, learning_rate, callbacks)
 
     @abstractmethod
-    def predict(self, x: np.ndarray, *args, **kwargs) -> np.ndarray:
+    def _train(self,
+              x: Iterable,
+              y: List[Iterable],
+              loss_func: Callable[[tf.Tensor, tf.Tensor], tf.Tensor],
+              epochs: int,
+              learning_rate: float,
+              callbacks: Optional[List[Callback]]):
+        pass
+
+    def predict(self, x: Iterable, *args, **kwargs) -> tf.Tensor:
         """
-        :param x: The batch of LR input images.
+        :param x: The LR input images.
         :param args, kwargs: Optional arguments for predictions. Possible values:
                         - int or float
                         A positive number defining the desired upsampling factor. (default: 2)
@@ -139,10 +157,17 @@ class Network(ABC):
                     upsampling factor of 2.
         :return: The predicted image batch with values [0-1].
         """
+        if isinstance(x, Dataset):
+            with x:
+                return self._predict(tf.convert_to_tensor(next(x)), *args, **kwargs)
+        return self._predict(tf.convert_to_tensor(x), *args, **kwargs)
+
+    @abstractmethod
+    def _predict(self, x: tf.Tensor, *args, **kwargs) -> tf.Tensor:
         pass
 
     @staticmethod
-    def _parse_predict_optionals(x: np.ndarray, args, kwargs) -> Tuple[int, int]:
+    def _parse_predict_optionals(x: tf.Tensor, args, kwargs) -> Tuple[int, int]:
         """Helper function for parsing the optional arguments given to the `predict` function.
 
         :return: The determined upsampling shape as a (height, width) tuple.

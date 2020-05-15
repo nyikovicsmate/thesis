@@ -1,4 +1,5 @@
-from typing import Optional, Tuple
+from itertools import zip_longest
+from typing import Optional, Tuple, Union
 
 import numpy as np
 import tensorflow as tf
@@ -22,7 +23,7 @@ class ReinforcedNetwork(Network):
         self._steps_per_episode = 5
         self._discount_factor = 0.95
 
-    def predict(self, x: np.ndarray, *args, **kwargs) -> np.ndarray:
+    def _predict(self, x: tf.Tensor, *args, **kwargs) -> tf.Tensor:
         size = self._parse_predict_optionals(x, args, kwargs)  # keep it for the logs
         s_t0_channels = tf.split(tf.convert_to_tensor(x), num_or_size_splits=x.shape[-1], axis=3)
         result = None
@@ -106,44 +107,35 @@ class ReinforcedNetwork(Network):
 
         return episode_r, total_loss
 
-    def train(self, dataset_x, dataset_y, loss_func, epochs, learning_rate=0.001, callbacks=None):
-        assert isinstance(dataset_y, Dataset), "Reinforced network can only be trained with single dataset."
+    def _train(self, x, y, loss_func, epochs, learning_rate, callbacks):
+        assert len(y) == 1, "Reinforced network can only be trained with single dataset."
         assert loss_func is None, "Reinforced network uses it's own loss function. Pass it `None`"
         learning_rate = tf.Variable(learning_rate)  # wrap variable according to callbacks.py:25
         optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate,
                                              beta_1=0.9,
                                              beta_2=0.999,
                                              epsilon=1e-8)
-        # open the datasets
-        with dataset_x, dataset_y:
-            iter_x = dataset_x.as_numpy_iterator()
-            iter_y = dataset_y.as_numpy_iterator()
-            # train
-            e_idx = 0
-            while e_idx < epochs:
-                # process a batch
-                try:
-                    start_sec = time.time()
-                    x = iter_x.next()
-                    y = iter_y.next()
-                    episode_r, train_loss = self._train_step(x, y, optimizer)
-                    # update state
-                    delta_sec = time.time() - start_sec
-                    self.state.epochs += 1
-                    self.state.train_loss = train_loss.numpy()
-                    self.state.train_time = delta_sec
-                    LOGGER.info(f"Epoch: {e_idx} episode_r: {episode_r:.2f} train_loss: {train_loss:.2f}")
-                    e_idx += 1
-                    # manually update learning rate and call iteration end callbacks
-                    for cb in callbacks:
-                        if isinstance(cb, OptimizerCallback):
-                            learning_rate.assign(cb(self))
-                        if isinstance(cb, TrainIterationEndCallback):
-                            cb(self)
-                except StopIteration:
-                    # reset iterators
-                    iter_x.reset()
-                    iter_y.reset()
+        # train
+        for e_idx in range(epochs):
+            train_loss = tf.constant(0, dtype=tf.float32)
+            start_sec = time.time()
+            # process a batch
+            random_y_idx = 0 if len(y) == 1 else np.random.randint(len(y))
+            for x_b, y_b in zip_longest(x, y[random_y_idx]):
+                episode_r, train_loss = self._train_step(x_b, y_b, optimizer)
+            # update state
+            delta_sec = time.time() - start_sec
+            self.state.epochs += 1
+            self.state.train_loss = train_loss.numpy()
+            self.state.train_time = delta_sec
+            LOGGER.info(f"Epoch: {e_idx} episode_r: {episode_r:.2f} train_loss: {train_loss:.2f}")
+            if callbacks:
+                # manually update learning rate and call iteration end callbacks
+                for cb in callbacks:
+                    if isinstance(cb, OptimizerCallback):
+                        learning_rate.assign(cb(self))
+                    if isinstance(cb, TrainIterationEndCallback):
+                        cb(self)
 
     @staticmethod
     @tf.function
