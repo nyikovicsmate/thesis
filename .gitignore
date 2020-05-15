@@ -1,11 +1,14 @@
-# model files
-model/
+# developmen datasets
+bsd500_*_gray.h5
+bsd500_*_color.h5
+set14_*_gray/
+set14_*_color/
 
-# prediction files
-predictions/
+# resarch files
+resarch/
 
-# image files
-data/
+# local run configurations
+src/train*.py
 
 # Editors
 .idea/
