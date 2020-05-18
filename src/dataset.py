@@ -343,6 +343,15 @@ class HDFDataset(Dataset):
         _copy._iter.map_funcs += [map_func]
         return _copy
 
+    def transform(self):
+        # TODO: generalize
+        """Sets a transformation flag on the dataset. If the flag is set, it makes the
+        dataset return transformed items. Transformations include: rotating 90, 180, 270,
+        and flipping."""
+        _copy = copy.copy(self)
+        _copy._iter.args = {"transform": 0}
+        return _copy
+
     class HDFDatasetIterator(Dataset.DatasetIterator):
 
         def __init__(self, dataset: "HDFDataset"):
@@ -357,7 +366,8 @@ class HDFDataset(Dataset):
                 "seed": None,
                 "reshuffle_each_iteration": True,
                 "ratio": None,   # indicates whether the dataset's been already split before (datasets cannot re-split)
-                "split_exactly": False
+                "split_exactly": False,
+                "transform": -1  # indicates whether to transform values before returning or not
             }
             self._map_funcs = []
 
@@ -398,6 +408,8 @@ class HDFDataset(Dataset):
                     if self._args["drop_remainder"] is True:
                         raise StopIteration()
                 # we got through all the checks
+                if self._args["transform"] >= 0:
+                    result = np.array(list(map(self._transform, result)), dtype=result.dtype)
                 # apply the mapping transformations
                 for func in self._map_funcs:
                     result = func(result)
@@ -460,3 +472,23 @@ class HDFDataset(Dataset):
             if len(result.shape) < 4:
                 result = np.reshape(result, (*result.shape, 1))
             return result
+
+        def _transform(self, img):
+            if self._args["transform"] == 0:
+                self._args["transform"] += 1
+                rot_90 = cv2.rotate(img, cv2.ROTATE_90_CLOCKWISE)
+                return rot_90
+            elif self._args["transform"] == 1:
+                self._args["transform"] += 1
+                rot_180 = cv2.rotate(img, cv2.ROTATE_180)
+                return rot_180
+            elif self._args["transform"] == 2:
+                self._args["transform"] += 1
+                rot_270 = cv2.rotate(img, cv2.ROTATE_90_COUNTERCLOCKWISE)
+                return rot_270
+            elif self._args["transform"] == 3:
+                self._args["transform"] = 0
+                flip_vertical = cv2.flip(img, flipCode=0)
+                return flip_vertical
+            else:
+                raise IndexError(f"Wrong transformation index [{self._args['transform']}].")
