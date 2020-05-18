@@ -254,7 +254,7 @@ class HDFDataset(Dataset):
         if not h5py.is_hdf5(str(self._path)):
             raise ValueError(f"{self._path} is not a valid hdf5 file.")
         self._file = None
-        self._iter = self.HDFDatasetIterator(self)
+        self._iter_inst = None
 
     def __len__(self):
         return len(self._images_dataset)
@@ -296,6 +296,16 @@ class HDFDataset(Dataset):
                               "Are you missing a 'with' statement?")
         return self._file["images"]
 
+    @property
+    def _iter(self) -> "HDFDataset.HDFDatasetIterator":
+        if self._iter_inst is None:
+            self._iter_inst = self.HDFDatasetIterator(self)
+        return self._iter_inst
+
+    @_iter.setter
+    def _iter(self, value):
+        self._iter_inst = value
+
     def as_numpy_iterator(self):
         return iter(self)
 
@@ -304,7 +314,7 @@ class HDFDataset(Dataset):
         _copy._iter.args = {"step": batch_size, "drop_remainder": drop_remainder}
         return _copy
 
-    def shuffle(self, seed: int = None, reshuffle_each_iteration: bool = True) -> "HDFDataset":
+    def shuffle(self, seed: int = np.random.randint(np.iinfo(np.int32).max), reshuffle_each_iteration: bool = True) -> "HDFDataset":
         _copy = copy.copy(self)
         _copy._iter.args = {"shuffle": True, "seed": seed, "reshuffle_each_iteration": reshuffle_each_iteration}
         return _copy
@@ -344,7 +354,7 @@ class HDFDataset(Dataset):
                 "drop_remainder": False,
                 "repeat": 1,    # repeat/replicate once
                 "shuffle": False,
-                "seed": np.random.randint(np.iinfo(np.int32).max),
+                "seed": None,
                 "reshuffle_each_iteration": True,
                 "ratio": None,   # indicates whether the dataset's been already split before (datasets cannot re-split)
                 "split_exactly": False
