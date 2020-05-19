@@ -1,5 +1,5 @@
 import copy
-from abc import ABC, abstractmethod
+from abc import ABCMeta, abstractmethod
 from typing import Dict, List, Union, Callable, Tuple
 
 import cv2
@@ -9,11 +9,30 @@ import numpy as np
 from src.config import *
 
 
-# TODO: unit tests
-
-
-class Dataset(ABC):
+class Dataset(metaclass=ABCMeta):
     """Abstract base class."""
+
+    @abstractmethod
+    def __enter__(self) -> "Dataset":
+        """Must set `self._handle`"""
+        pass
+
+    @abstractmethod
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Must clear `self._handle` and free the resources."""
+        pass
+
+    @abstractmethod
+    def _data(self) -> np.ndarray:
+        """Returns the data as a sequence.
+
+        https://docs.python.org/3/glossary.html#term-sequence
+
+        'An iterable which supports efficient element access using integer indices
+        via the __getitem__() special method and defines a __len__() method that
+        returns the length of the sequence.'
+        """
+        pass
 
     def __init__(self, path: Union[str, pathlib.Path]):
         """
@@ -26,37 +45,38 @@ class Dataset(ABC):
             raise FileExistsError(f"{self._path} does not exist. {chr(10)}"  # chr(10) = newline
                                   f"For relative paths, root is: {chr(10)} {ROOT_PATH} {chr(10)}"
                                   f"Parameter given: {chr(10)} {path}")
+        self._handle = None
+        self._iter = Dataset.DatasetIterator(self)
 
-    @abstractmethod
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+
+        def resource_property(func):
+            @property
+            def wrapper(self):
+                if self._handle is None:
+                    raise SyntaxError("Datasets are supposed to be called from within a resource block. "
+                                      "Are you missing a 'with' statement?")
+                return func(self)
+            return wrapper
+        cls._data = resource_property(cls._data)
+
     def __len__(self):
-        pass
+        return len(self._data)
 
-    @abstractmethod
     def __getitem__(self, item):
-        pass
+        return self._data[item]
 
-    @abstractmethod
     def __iter__(self):
-        pass
+        self._iter.reset()
+        return self._iter.__iter__()
 
-    @abstractmethod
-    def __next__(self):
-        pass
+    def __copy__(self):
+        _copy = self.__class__(self._path)
+        _copy._iter._args = copy.deepcopy(self._iter._args)
+        _copy._iter._map_funcs = copy.deepcopy(self._iter._map_funcs)
+        return _copy
 
-    @abstractmethod
-    def __enter__(self):
-        pass
-
-    @abstractmethod
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        pass
-
-    @abstractmethod
-    def as_numpy_iterator(self) -> "Dataset.DatasetIterator":
-        """Returns an iterator which converts all elements of the dataset to numpy."""
-        pass
-
-    @abstractmethod
     def batch(self, batch_size: int, drop_remainder: bool = False) -> "Dataset":
         """Combines consecutive elements of this dataset into batches.
 
@@ -76,23 +96,11 @@ class Dataset(ABC):
            Returns:
              Dataset: A `Dataset`.
            """
-        pass
+        _copy = copy.copy(self)
+        _copy._iter.args = {"step": batch_size, "drop_remainder": drop_remainder}
+        return _copy
 
-    @abstractmethod
-    def repeat(self, count: int = 1) -> "Dataset":
-        """Repeats this dataset so each original value is seen `count` times.
-
-            Args:
-              count: (Optional.) An integer, representing the number of times
-                the dataset should be repeated. The default behavior (if
-                `count` is `1`) is for the dataset be repeated once.
-            Returns:
-              Dataset: A `Dataset`.
-            """
-        pass
-
-    @abstractmethod
-    def shuffle(self, seed: int = None, reshuffle_each_iteration: bool = True) -> "Dataset":
+    def shuffle(self, seed: int = np.random.randint(np.iinfo(np.int32).max), reshuffle_each_iteration: bool = True) -> "Dataset":
         """Randomly shuffles the elements of this dataset.
 
             Args:
@@ -104,9 +112,26 @@ class Dataset(ABC):
             Returns:
               Dataset: A `Dataset`.
             """
-        pass
+        _copy = copy.copy(self)
+        _copy._iter.args = {"shuffle": True, "seed": seed, "reshuffle_each_iteration": reshuffle_each_iteration}
+        return _copy
 
-    @abstractmethod
+    def repeat(self, count: int = 1) -> "Dataset":
+        """Repeats this dataset so each original value is seen `count` times.
+
+            Args:
+              count: (Optional.) An integer, representing the number of times
+                the dataset should be repeated. The default behavior (if
+                `count` is `1`) is for the dataset be repeated once.
+            Returns:
+              Dataset: A `Dataset`.
+            """
+        if count <= 0:
+            raise ValueError("Repeat count should be a positive integer.")
+        _copy = copy.copy(self)
+        _copy._iter.args = {"repeat": count}
+        return _copy
+
     def split(self, ratio: Tuple, split_exactly: bool = False) -> List["Dataset"]:
         """Splits the dataset into smaller chunks according to the `ratio` parameter.
 
@@ -123,9 +148,15 @@ class Dataset(ABC):
               Dataset: A list of `Dataset`-s. The actual number of datasets are determined by
               the `ratio` parameter.
             """
-        pass
+        _copies = []
+        for i in range(len(ratio)):
+            _copy = copy.copy(self)
+            # append the index of the dataset to the ratio parameter
+            r = (*ratio, i)
+            _copy._iter.args = {"ratio": r, "split_exactly": split_exactly}
+            _copies.append(_copy)
+        return _copies
 
-    @abstractmethod
     def map(self, map_func: Callable) -> "Dataset":
         """Maps `map_func` across the elements of this dataset.
 
@@ -139,204 +170,6 @@ class Dataset(ABC):
             Returns:
               Dataset: A `Dataset`.
             """
-        pass
-
-    class DatasetIterator(ABC):
-
-        @abstractmethod
-        def __iter__(self):
-            pass
-
-        @abstractmethod
-        def __next__(self):
-            pass
-
-        @abstractmethod
-        def advance(self):
-            """Skips an iteration. Mainly used to keep iterators in sync."""
-            pass
-
-        @abstractmethod
-        def reset(self):
-            """Resets the iterator state."""
-            pass
-
-
-class DirectoryDataset(Dataset):
-
-    def __init__(self, path: Union[str, pathlib.Path]):
-        super().__init__(path)
-        if not self._path.is_dir():
-            raise ValueError(f"{self._path} is not a directory.")
-        self._supported_extensions: List[str] = ["jpg", "png"]
-        self._image_paths = self._get_image_paths()
-        self._iter = self.DirectoryDatasetIterator(self)
-
-    def __len__(self):
-        return len(self._image_paths)
-
-    def __getitem__(self, item):
-        return DirectoryDataset._get_image(self._image_paths[item])
-
-    def __iter__(self):
-        return iter(self._iter)
-
-    def __next__(self):
-        return next(iter(self))
-
-    def __enter__(self):
-        # TODO: technically the image loading should happen here
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        # TODO: if `__enter__` loads the images, this should clear the reference
-        return False
-
-    def as_numpy_iterator(self) -> "Dataset.DatasetIterator":
-        raise NotImplementedError()
-
-    def batch(self, batch_size: int, drop_remainder: bool = False) -> "Dataset":
-        raise NotImplementedError()
-
-    def repeat(self, count: int = 1) -> "Dataset":
-        raise NotImplementedError()
-
-    def shuffle(self, seed: int = None, reshuffle_each_iteration: bool = True) -> "Dataset":
-        raise NotImplementedError()
-
-    def split(self, ratio: Tuple, split_exactly: bool = False) -> List["Dataset"]:
-        raise NotImplementedError()
-
-    def map(self, map_func: Callable) -> "Dataset":
-        raise NotImplementedError()
-
-    def _get_image_paths(self) -> List[pathlib.Path]:
-        """
-        Returns a list of absolute image paths found recursively starting from the scripts directory.
-        """
-        image_paths = []
-        for ext in self._supported_extensions:
-            image_paths.extend(list(self._path.rglob(f"*.{ext}")))
-        return image_paths
-
-    @staticmethod
-    def _get_image(path: Union[str, pathlib.Path]):
-        return cv2.imread(str(path), cv2.IMREAD_COLOR)
-
-    class DirectoryDatasetIterator(Dataset.DatasetIterator):
-
-        def __init__(self, dataset: "DirectoryDataset"):
-            self._dataset = dataset
-
-        def __iter__(self):
-            self.i = 0
-            return self
-
-        def __next__(self):
-            if self.i < len(self._dataset):
-                result = DirectoryDataset._get_image(self._dataset._image_paths[self.i])
-                self.i += 1
-                return result
-            else:
-                raise StopIteration()
-
-        def advance(self):
-            raise NotImplementedError()
-
-        def reset(self):
-            raise NotImplementedError()
-
-
-class HDFDataset(Dataset):
-
-    def __init__(self, path: Union[str, pathlib.Path]):
-        super().__init__(path)
-        if not h5py.is_hdf5(str(self._path)):
-            raise ValueError(f"{self._path} is not a valid hdf5 file.")
-        self._file = None
-        self._iter_inst = None
-
-    def __len__(self):
-        return len(self._images_dataset)
-
-    def __getitem__(self, item):
-        return self._images_dataset[item]
-
-    def __iter__(self):
-        self._iter = copy.copy(self._iter)
-        return iter(self._iter)
-
-    def __next__(self):
-        return next(iter(self))
-
-    def __enter__(self):
-        # defer opening the file until now, this way one can check for the None reference
-        # in other functions before actually accessing the file
-        self._file = h5py.File(str(self._path), mode="r")
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        # close the file handle
-        self._file.close()
-        self._file = None  # clear reference, otherwise a closed hdf file is tricky to detect
-        # re-raise any other exception that might have happened
-        return False
-
-    def __copy__(self):
-        _copy = HDFDataset(self._path)
-        _copy._file = self._file    # don't lose the file object
-        _copy._iter._args = copy.deepcopy(self._iter._args)
-        _copy._iter._map_funcs = copy.deepcopy(self._iter._map_funcs)
-        return _copy
-
-    @property
-    def _images_dataset(self):
-        if self._file is None:
-            raise SyntaxError("Datasets are supposed to be called from within a resource block. "
-                              "Are you missing a 'with' statement?")
-        return self._file["images"]
-
-    @property
-    def _iter(self) -> "HDFDataset.HDFDatasetIterator":
-        if self._iter_inst is None:
-            self._iter_inst = self.HDFDatasetIterator(self)
-        return self._iter_inst
-
-    @_iter.setter
-    def _iter(self, value):
-        self._iter_inst = value
-
-    def as_numpy_iterator(self):
-        return iter(self)
-
-    def batch(self, batch_size: int, drop_remainder: bool = False) -> "HDFDataset":
-        _copy = copy.copy(self)
-        _copy._iter.args = {"step": batch_size, "drop_remainder": drop_remainder}
-        return _copy
-
-    def shuffle(self, seed: int = np.random.randint(np.iinfo(np.int32).max), reshuffle_each_iteration: bool = True) -> "HDFDataset":
-        _copy = copy.copy(self)
-        _copy._iter.args = {"shuffle": True, "seed": seed, "reshuffle_each_iteration": reshuffle_each_iteration}
-        return _copy
-
-    def repeat(self, count: int = 1) -> "HDFDataset":
-        if count <= 0:
-            raise ValueError("Repeat count should be a positive integer.")
-        _copy = copy.copy(self)
-        _copy._iter.args = {"repeat": count}
-        return _copy
-
-    def split(self, ratio: Tuple, split_exactly: bool = False) -> List["Dataset"]:
-        _copies = []
-        for i in range(len(ratio)):
-            _copy = copy.copy(self)
-            # append the index of the dataset to the ratio parameter
-            r = (*ratio, i)
-            _copy._iter.args = {"ratio": r, "split_exactly": split_exactly}
-            _copies.append(_copy)
-        return _copies
-
-    def map(self, map_func) -> "HDFDataset":
         if not callable(map_func):
             raise TypeError("'func' must be callable.")
         _copy = copy.copy(self)
@@ -344,46 +177,67 @@ class HDFDataset(Dataset):
         return _copy
 
     def transform(self):
-        # TODO: generalize
         """Sets a transformation flag on the dataset. If the flag is set, it makes the
         dataset return transformed items. Transformations include: rotating 90, 180, 270,
         and flipping."""
         _copy = copy.copy(self)
-        _copy._iter.args = {"transform": 0}
+        _copy._iter.args = {"transform": True, "transform_id": 0}
         return _copy
 
-    class HDFDatasetIterator(Dataset.DatasetIterator):
+    class DatasetIterator(metaclass=ABCMeta):
 
-        def __init__(self, dataset: "HDFDataset"):
-            self._dataset = dataset
+        @property
+        def args(self):
+            return self._args
+
+        @args.setter
+        def args(self, value: Dict):
+            self.reset()  # reset iteration when setting new arguments
+            for k, v in value.items():
+                if k not in self._args.keys():
+                    raise KeyError(f"Trying to set a non-existent argument key `{k}`.")
+                self._args[k] = v if k in self._args.keys() else self._args[k]
+
+        @property
+        def map_funcs(self):
+            return self._map_funcs
+
+        @map_funcs.setter
+        def map_funcs(self, value):
+            self.reset()
+            self._map_funcs = value
+
+        def __init__(self, dataset: "Dataset"):
+            self.dataset = dataset
             self.i = 0
             self.indexes = None
             self._args = {  # default argument values
                 "step": -1,
                 "drop_remainder": False,
-                "repeat": 1,    # repeat/replicate once
+                "repeat": 1,  # repeat/replicate once
                 "shuffle": False,
                 "seed": None,
                 "reshuffle_each_iteration": True,
-                "ratio": None,   # indicates whether the dataset's been already split before (datasets cannot re-split)
+                "ratio": [],  # indicates whether the dataset's been already split before (datasets cannot re-split)
                 "split_exactly": False,
-                "transform": -1  # indicates whether to transform values before returning or not
+                "transform": False,  # indicates whether to transform values before returning or not
+                "transform_id": 0   # current transformation's id
             }
             self._map_funcs = []
 
         def __iter__(self):
             if self.indexes is None:
                 # try to get the length of the dataset
-                # if the dataset isn't used within a resource block the getter will throw a TypeError
-                _len = len(self._dataset)
-                if self._args["ratio"] is None:
+                _len = len(self.dataset)
+                if self._args["ratio"]  == []:
                     self.indexes = np.arange(_len)
                 else:
                     _total = np.sum(self._args["ratio"][:-1])
                     # truncate the length if necessary
                     if self._args["split_exactly"] is True and _len % _total != 0:
                         _len -= _len % _total
-                    _start = 0 if self._args["ratio"][-1] == 0 else (np.sum(self._args["ratio"][:self._args["ratio"][-1]]) / _total) * _len
+                    _start = 0 if self._args["ratio"][-1] == 0 else (np.sum(
+                            self._args["ratio"][:self._args["ratio"][-1]]) / _total) * _len
                     _end = _start + (self._args["ratio"][self._args["ratio"][-1]] / _total) * _len
                     self.indexes = np.arange(int(_start), int(_end))
                 if self._args["step"] == -1:
@@ -408,49 +262,47 @@ class HDFDataset(Dataset):
                     if self._args["drop_remainder"] is True:
                         raise StopIteration()
                 # we got through all the checks
-                if self._args["transform"] >= 0:
+                # apply the built in transformatins
+                if self._args["transform"] is True:
                     result = np.array(list(map(self._transform, result)), dtype=result.dtype)
                 # apply the mapping transformations
                 for func in self._map_funcs:
                     result = func(result)
                 return result
             else:
+                self.reset()
                 raise StopIteration()
 
-        def __copy__(self):
-            _copy = HDFDataset.HDFDatasetIterator(self._dataset)
-            _copy.indexes = self.indexes
-            _copy._args = self._args
-            _copy._map_funcs = self._map_funcs
-            return _copy
-
-        @property
-        def args(self):
-            return self._args
-
-        @args.setter
-        def args(self, value: Dict):
-            self.reset()  # reset iteration when setting new arguments
-            for k, v in value.items():
-                self._args[k] = v if k in self._args.keys() else self._args[k]
-
-        @property
-        def map_funcs(self):
-            return self._map_funcs
-
-        @map_funcs.setter
-        def map_funcs(self, value):
-            self.reset()
-            self._map_funcs = value
-
-        def advance(self):
-            self.i += self.args["step"]
+        def _transform(self, img):
+            if self._args["transform_id"] == 0:
+                self._args["transform_id"] += 1
+                rot_90 = cv2.rotate(img, cv2.ROTATE_90_CLOCKWISE)
+                return rot_90
+            elif self._args["transform_id"] == 1:
+                self._args["transform_id"] += 1
+                rot_180 = cv2.rotate(img, cv2.ROTATE_180)
+                return rot_180
+            elif self._args["transform_id"] == 2:
+                self._args["transform_id"] += 1
+                rot_270 = cv2.rotate(img, cv2.ROTATE_90_COUNTERCLOCKWISE)
+                return rot_270
+            elif self._args["transform_id"] == 3:
+                self._args["transform_id"] = 0
+                flip_vertical = cv2.flip(img, flipCode=0)
+                return flip_vertical
+            else:
+                raise IndexError(f"Wrong transformation index [{self._args['transform_id']}].")
 
         def reset(self):
             self.i = 0
             self.indexes = None
 
-        def _get_index_data(self, idxs: List[int]):
+        def _get_index_data(self, idxs: List[int]) -> np.ndarray:
+            """Returns values at positions determined by indexes found in `idxs`.
+
+            :param idxs: list of value indexes to get
+            :return: 4D shaped np.ndarray (batch, height, width, channels) with 8-bit integer values
+            """
             result = None
             # if the indexes are shuffled, some extra work is needed
             if self._args["shuffle"]:
@@ -458,7 +310,7 @@ class HDFDataset(Dataset):
                 # h5py supports index ranges, read times are significantly faster
                 # than reading each image separately
                 # but with random indexes the indexes must be in ascending order
-                images_sorted = np.array(self._dataset._images_dataset[idxs_sorted], dtype=np.uint8)
+                images_sorted = np.array(self.dataset._data[idxs_sorted], dtype=np.uint8)
                 # drawback of this implementation, is that the images are read in the wrong order,
                 # so we have to unsort them
                 positions = dict(zip(idxs_sorted, np.arange(len(idxs_sorted))))
@@ -467,28 +319,55 @@ class HDFDataset(Dataset):
                     images[i] = images_sorted[positions[idx]]
                 result = images
             else:
-                result = np.array(self._dataset._images_dataset[list(idxs)], dtype=np.uint8)
+                result = np.array(self.dataset._data[list(idxs)], dtype=np.uint8)
             # reshape the result if necessar to ensure it's 4D (count, height, width, depth)
             if len(result.shape) < 4:
                 result = np.reshape(result, (*result.shape, 1))
             return result
 
-        def _transform(self, img):
-            if self._args["transform"] == 0:
-                self._args["transform"] += 1
-                rot_90 = cv2.rotate(img, cv2.ROTATE_90_CLOCKWISE)
-                return rot_90
-            elif self._args["transform"] == 1:
-                self._args["transform"] += 1
-                rot_180 = cv2.rotate(img, cv2.ROTATE_180)
-                return rot_180
-            elif self._args["transform"] == 2:
-                self._args["transform"] += 1
-                rot_270 = cv2.rotate(img, cv2.ROTATE_90_COUNTERCLOCKWISE)
-                return rot_270
-            elif self._args["transform"] == 3:
-                self._args["transform"] = 0
-                flip_vertical = cv2.flip(img, flipCode=0)
-                return flip_vertical
-            else:
-                raise IndexError(f"Wrong transformation index [{self._args['transform']}].")
+
+class DirectoryDataset(Dataset):
+
+    def __init__(self, path: Union[str, pathlib.Path]):
+        super().__init__(path)
+        if not self._path.is_dir():
+            raise ValueError(f"{self._path} is not a directory.")
+        self._supported_extensions: List[str] = ["jpg", "png"]
+
+    def __enter__(self) -> Dataset:
+        image_paths = []
+        for ext in self._supported_extensions:
+            image_paths.extend(list(self._path.rglob(f"*.{ext}")))
+        self._handle = image_paths
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self._handle = None
+        return False
+
+    def _data(self) -> np.ndarray:
+        return np.array([cv2.imread(str(path), cv2.IMREAD_COLOR) for path in self._handle], dtype=np.uint8)
+
+
+class HDFDataset(Dataset):
+
+    def __init__(self, path: Union[str, pathlib.Path]):
+        super().__init__(path)
+        if not h5py.is_hdf5(str(self._path)):
+            raise ValueError(f"{self._path} is not a valid hdf5 file.")
+
+    def __enter__(self) -> Dataset:
+        # defer opening the file until now, this way one can check for the None reference
+        # in other functions before actually accessing the file
+        self._handle = h5py.File(str(self._path), mode="r")
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        # close the file handle
+        self._handle.close()
+        self._handle = None  # clear reference, otherwise a closed hdf file is tricky to detect
+        # re-raise any other exception that might have happened
+        return False
+
+    def _data(self) -> np.ndarray:
+        return self._handle["images"]
