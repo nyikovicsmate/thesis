@@ -17,7 +17,7 @@ class PostUpsamplingModel(tf.keras.models.Model):
         super().__init__()
         # feature extraction
         self.conv_0 = tf.keras.layers.Conv2D(input_shape=input_shape,
-                                             filters=56,
+                                             filters=256,
                                              kernel_size=5,
                                              strides=1,
                                              padding="same",
@@ -29,7 +29,7 @@ class PostUpsamplingModel(tf.keras.models.Model):
                                              bias_initializer=tf.keras.initializers.Zeros())
         self.act_0 = tf.keras.layers.PReLU()
         # shrinking
-        self.conv_1 = tf.keras.layers.Conv2D(filters=12,
+        self.conv_1 = tf.keras.layers.Conv2D(filters=64,
                                              kernel_size=1,
                                              strides=1,
                                              padding="same",
@@ -41,7 +41,7 @@ class PostUpsamplingModel(tf.keras.models.Model):
                                              bias_initializer=tf.keras.initializers.Zeros())
         self.act_1 = tf.keras.layers.PReLU()
         # mapping (m = 4)
-        self.conv_2_0 = tf.keras.layers.Conv2D(filters=12,
+        self.conv_2_0 = tf.keras.layers.Conv2D(filters=64,
                                                kernel_size=3,
                                                strides=1,
                                                padding="same",
@@ -52,7 +52,7 @@ class PostUpsamplingModel(tf.keras.models.Model):
                                                kernel_initializer=tf.keras.initializers.he_uniform(),
                                                bias_initializer=tf.keras.initializers.Zeros())
         self.act_2_0 = tf.keras.layers.PReLU()
-        self.conv_2_1 = tf.keras.layers.Conv2D(filters=12,
+        self.conv_2_1 = tf.keras.layers.Conv2D(filters=64,
                                                kernel_size=3,
                                                strides=1,
                                                padding="same",
@@ -63,7 +63,7 @@ class PostUpsamplingModel(tf.keras.models.Model):
                                                kernel_initializer=tf.keras.initializers.he_uniform(),
                                                bias_initializer=tf.keras.initializers.Zeros())
         self.act_2_1 = tf.keras.layers.PReLU()
-        self.conv_2_2 = tf.keras.layers.Conv2D(filters=12,
+        self.conv_2_2 = tf.keras.layers.Conv2D(filters=64,
                                                kernel_size=3,
                                                strides=1,
                                                padding="same",
@@ -74,7 +74,7 @@ class PostUpsamplingModel(tf.keras.models.Model):
                                                kernel_initializer=tf.keras.initializers.he_uniform(),
                                                bias_initializer=tf.keras.initializers.Zeros())
         self.act_2_2 = tf.keras.layers.PReLU()
-        self.conv_2_3 = tf.keras.layers.Conv2D(filters=12,
+        self.conv_2_3 = tf.keras.layers.Conv2D(filters=64,
                                                kernel_size=3,
                                                strides=1,
                                                padding="same",
@@ -86,7 +86,7 @@ class PostUpsamplingModel(tf.keras.models.Model):
                                                bias_initializer=tf.keras.initializers.Zeros())
         self.act_2_3 = tf.keras.layers.PReLU()
         # expanding
-        self.conv_3 = tf.keras.layers.Conv2D(filters=56,
+        self.conv_3 = tf.keras.layers.Conv2D(filters=128,
                                              kernel_size=1,
                                              strides=1,
                                              padding="same",
@@ -99,7 +99,7 @@ class PostUpsamplingModel(tf.keras.models.Model):
         self.act_3 = tf.keras.layers.PReLU()
         # deconvolution
         self.conv_4 = tf.keras.layers.Conv2DTranspose(filters=input_shape[-1],
-                                                      kernel_size=9,
+                                                      kernel_size=5,
                                                       strides=2,  # upsampling factor
                                                       padding="same",
                                                       data_format="channels_last",
