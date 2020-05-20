@@ -23,8 +23,8 @@ class AdversarialPreUpsamplingNetwork(AdversarialNetwork):
         :return:
         """
         # epsilon = 1e-6
-        w0 = tf.constant(0.6, dtype=tf.float32)
-        w1 = tf.constant(0.4, dtype=tf.float32)
+        w0 = tf.constant(0.4, dtype=tf.float32)
+        w1 = tf.constant(0.6, dtype=tf.float32)
         mse_loss = tf.reduce_sum(w0 * tf.losses.mse(y, y_pred))  # aka. "content loss"
         # disc_loss = tf.reduce_sum(w1 * -tf.math.log(tf.clip_by_value(self.discriminator.predict(y_pred), epsilon, 1-epsilon)))       # aka. "adversarial loss"
         y_disc = self.discriminator_network.predict(y_pred)
