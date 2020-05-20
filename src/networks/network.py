@@ -159,7 +159,7 @@ class Network(ABC):
         """
         if isinstance(x, Dataset):
             with x:
-                return self._predict(tf.convert_to_tensor(next(x)), *args, **kwargs)
+                return self._predict(tf.convert_to_tensor(next(iter(x))), *args, **kwargs)
         return self._predict(tf.convert_to_tensor(x), *args, **kwargs)
 
     @abstractmethod

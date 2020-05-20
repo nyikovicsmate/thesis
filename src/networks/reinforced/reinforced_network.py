@@ -1,5 +1,5 @@
 from itertools import zip_longest
-from typing import Optional, Tuple, Union
+from typing import Optional, Tuple, Union, Callable
 
 import numpy as np
 import tensorflow as tf
@@ -17,15 +17,64 @@ class ReinforcedNetwork(Network):
     Pixelwise asyncronous agent network. (PixelwiseA3CNetwork)
     """
 
+    @property
+    def noise_func(self):
+        return self._noise_func
+
+    @noise_func.setter
+    def noise_func(self, func: Callable):
+        if not isinstance(func, Callable):
+            raise TypeError("Noise function must be an instance of `typing.Callable`.")
+        if func.__code__.co_argcount != 1:
+            raise AttributeError(f"Noise function must have exactly 1 parameter, the image which to process. Got {func.__code__.co_varnames}")
+        test_img = np.zeros(shape=(1, 10, 10, 3), dtype=np.float32)
+        ret = func(test_img)
+        if type(ret) is not np.ndarray and len(ret.shape) != 4:
+            raise TypeError("Noise function must return 4D numpy.ndarray type with (batch, height, width, channel) dimensions.")
+        self._noise_func = func
+
+    @staticmethod
+    def _normalized_noise_func(images: np.ndarray) -> np.ndarray:
+        """
+        Adds noise to image.
+        :param images: A batch of images, 4D array (batch, height, width, channels)
+        :return: The noisy batch of input images.
+        """
+        fill_value = 0.5
+        try:
+            # this will fail unless there is exactly 4 dimensions to unpack from
+            batch, height, width, channels = images.shape
+        except ValueError:
+            raise TypeError(f"Image must be a 4D numpy array. Got shape {images.shape}")
+        if channels == 1:
+            for img in images:
+                for h in range(height):
+                    if h % 2 == 0:
+                        img[h][0::2] = [fill_value]
+                    else:
+                        img[h][1::2] = [fill_value]
+        elif channels == 3:
+            for img in images:
+                for h in range(height):
+                    if h % 2 == 0:
+                        img[h][0::2] = [fill_value, fill_value, fill_value]
+                    else:
+                        img[h][1::2] = [fill_value, fill_value, fill_value]
+        else:
+            raise ValueError(f"Unsupported number of image dimensions, got {channels}")
+        return images
+
     def __init__(self):
         model = ReinforcedModel()
         super().__init__(model)
         self._steps_per_episode = 5
         self._discount_factor = 0.95
+        self._noise_func = ReinforcedNetwork._normalized_noise_func
 
     def _predict(self, x: tf.Tensor, *args, **kwargs) -> tf.Tensor:
         size = self._parse_predict_optionals(x, args, kwargs)  # keep it for the logs
-        s_t0_channels = tf.split(tf.convert_to_tensor(x), num_or_size_splits=x.shape[-1], axis=3)
+        x = tf.convert_to_tensor(self.noise_func(x.numpy()))
+        s_t0_channels = tf.split(x, num_or_size_splits=x.shape[-1], axis=3)
         result = None
         for s_t0 in s_t0_channels:
             for t in range(self._steps_per_episode):
@@ -109,7 +158,12 @@ class ReinforcedNetwork(Network):
 
     def _train(self, x, y, loss_func, epochs, learning_rate, callbacks):
         assert len(y) == 1, "Reinforced network can only be trained with single dataset."
+        y = y[0]
         assert loss_func is None, "Reinforced network uses it's own loss function. Pass it `None`"
+        x_b = next(iter(x))
+        y_b = next(iter(y))
+        assert x_b.shape[-1] == y_b.shape[-1] == 1, f"Reinforced network uses single channel images for trainig. Got x: {x_b.shape[-1]}, y: {y_b.shape[-1]}"
+        assert x_b.shape[1:3] == y_b.shape[1:3], f"Both datasets must have similarly sized images. Got x: {x_b.shape[1:3]}, y: {y_b.shape[1:3]}"
         learning_rate = tf.Variable(learning_rate)  # wrap variable according to callbacks.py:25
         optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate,
                                              beta_1=0.9,
@@ -120,9 +174,8 @@ class ReinforcedNetwork(Network):
             train_loss = tf.constant(0, dtype=tf.float32)
             start_sec = time.time()
             # process a batch
-            random_y_idx = 0 if len(y) == 1 else np.random.randint(len(y))
-            for x_b, y_b in zip_longest(x, y[random_y_idx]):
-                episode_r, train_loss = self._train_step(x_b, y_b, optimizer)
+            for x_b, y_b in zip_longest(x, y):
+                episode_r, train_loss = self._train_step(self.noise_func(x_b), y_b, optimizer)
             # update state
             delta_sec = time.time() - start_sec
             self.state.epochs += 1

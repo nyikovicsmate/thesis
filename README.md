@@ -28,7 +28,8 @@ hidered by the upsampling algorithm.
 
 ![results](https://raw.githubusercontent.com/nyikovicsmate/thesis/master/documentation/img/pre_r.png)
 
-PSNR=18.19
+`SSIM=0.70`
+`PSNR=20.70`
 
 ##### Post-upsampling model (FSRCNN)
 
@@ -41,7 +42,8 @@ still hidered by the upsampling.
 
 ![results](https://raw.githubusercontent.com/nyikovicsmate/thesis/master/documentation/img/post_r.png)
 
-PSNR=16.26
+`SSIM=0.60`
+`PSNR=19.21`
 
 ##### Progressive upsampling model (LapSRN)
 
@@ -59,7 +61,8 @@ features, especially for large (4x, 8x) scaling factors.
 
 ![results](https://raw.githubusercontent.com/nyikovicsmate/thesis/master/documentation/img/prog_r.png)
 
-PSNR=18.35
+`SSIM=0.70`
+`PSNR=20.68`
 
 ##### Iterative upsampling model (LapSRN)
 
@@ -72,7 +75,9 @@ feedback mechanism for projection errors.
 
 ![results](https://raw.githubusercontent.com/nyikovicsmate/thesis/master/documentation/img/iter_r.png)
 
-PSNR=15.31 (doue to bug, should be around 27)
+
+`SSIM=0.65`
+`PSNR=19.22`
 
 #### Adversarial
 
@@ -94,16 +99,17 @@ strives for maximum reward.
 
 ![results](https://raw.githubusercontent.com/nyikovicsmate/thesis/master/documentation/img/reinf_r.png)
 
-PSNR=20.87
+`SSIM=0.81`
+`PSNR=22.37`
 
 ### How to use
 
 #### Predict
 
 For prediction purposes, I've included pre-trained models. To use them, all you have to do is:
-1. Instantinate a network e.g.: `network = IterativeSamplingNetwork()` 
-2. Load the pre-trained state/weights: `network.load_state()`
-3. Get your images as a 4D numpy array, shaped (count, height, width, channels) - **currently only grayscale (channels=1) images are supported**
+1. Instantinate a network e.g.: `network = IterativeSamplingNetwork((35, 35, 1))` for grayscale, `network = IterativeSamplingNetwork((35, 35, 3))` for colored images
+2. Load the pre-trained state/weights: `network.load_state()` for grayscale, `network.load_state("_color")` for colored images
+3. Get your images as a 4D numpy array, shaped (count, height, width, channels)
 4. Predict: `predicted_images = network.predict(your_4d_numpy_image_array)` The `predict` method supports an optional `scaling_factor: int` parameter. The default scaling is 2x, but most of the models suppot 4x, 8x as well.  
 
 Complete example:
@@ -114,18 +120,17 @@ import cv2
 
 from src.networks.supervised.pre_upsampling_network import PreUpsamplingNetwork
 
-network = PreUpsamplingNetwork()
-network.load_state()
+network = PreUpsamplingNetwork((35, 35, 3))
+network.load_state("_color")
 
-img = cv2.imread(<path to your image>, cv2.IMREAD_GRAYSCALE)
+img = cv2.imread(<path to your image>, cv2.IMREAD_COLOR)
 img = cv2.resize(img, (35, 35), cv2.INTER_CUBIC)    # network works with 35x35 images
-img = img[np.newaxis, :, :, np.newaxis]   # get the 4D shaped image numpy array
-img = img / 255.0	# normalize image
+img = img[np.newaxis, :, :, :]   # get the 4D shaped image numpy array
+img = img / 255.0	# normalize image values
 pred = network.predict(img, 2)  # upsample the image by 2x
-pred = pred * 255.0   # revert normalization
 
 # display the image
-cv2.imshow("2x image", pred[0].astype(np.uint8))     # pred is also a 4D array, we want to display the first (and only) image
+cv2.imshow("2x image", pred[0])     # pred is also a 4D array, we want to display the first (and in this case only) image
 cv2.waitKey()
 ```
 
