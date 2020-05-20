@@ -40,7 +40,7 @@ class ReinforcedNetwork(Network):
         :param images: A batch of images, 4D array (batch, height, width, channels)
         :return: The noisy batch of input images.
         """
-        fill_value = 1.0
+        fill_value = 0.5
         try:
             # this will fail unless there is exactly 4 dimensions to unpack from
             batch, height, width, channels = images.shape
