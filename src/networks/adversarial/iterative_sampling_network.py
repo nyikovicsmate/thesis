@@ -12,8 +12,10 @@ class AdversarialIterativeSamplingNetwork(AdversarialNetwork):
     def __init__(self,
                  input_shape: Tuple[Optional[int], Optional[int], Optional[int]] = (None, None, 3)):
         gen = IterativeSamplingNetwork(input_shape)
-        gen.load_state()
+        # TODO: fix loading colored states
+        gen.load_state("_color")
         disc = DiscriminatorNetwork(input_shape)
+        disc.load_state("_color")
         super().__init__(gen, disc)
 
     def generator_loss(self, y: tf.Tensor, y_pred: tf.Tensor):
@@ -23,8 +25,8 @@ class AdversarialIterativeSamplingNetwork(AdversarialNetwork):
         :return:
         """
         # epsilon = 1e-6
-        w0 = tf.constant(0.4, dtype=tf.float32)
-        w1 = tf.constant(0.6, dtype=tf.float32)
+        w0 = tf.constant(0.3, dtype=tf.float32)
+        w1 = tf.constant(0.7, dtype=tf.float32)
         mse_loss = tf.reduce_sum(w0 * tf.losses.mse(y, y_pred))  # aka. "content loss"
         # disc_loss = tf.reduce_sum(w1 * -tf.math.log(tf.clip_by_value(self.discriminator.predict(y_pred), epsilon, 1-epsilon)))       # aka. "adversarial loss"
         y_disc = self.discriminator_network.predict(y_pred)
