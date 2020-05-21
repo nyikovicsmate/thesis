@@ -30,6 +30,7 @@ class AdversarialNetwork(metaclass=ABCMeta):
     def save_state(self,
                    generator_appendix: str = "",
                    discriminator_appendix: str = ""):
+        # TODO: refine this
         discriminator_appendix = f"_{str.lower(self.__class__.__name__)}" if discriminator_appendix == "" else discriminator_appendix
         self.generator_network.save_state(generator_appendix)
         self.discriminator_network.save_state(discriminator_appendix)
@@ -37,6 +38,7 @@ class AdversarialNetwork(metaclass=ABCMeta):
     def load_state(self,
                    generator_appendix: str = "",
                    discriminator_appendix: str = ""):
+        # TODO: refine this
         discriminator_appendix = f"_{str.lower(self.__class__.__name__)}" if discriminator_appendix == "" else discriminator_appendix
         self.generator_network.load_state(generator_appendix)
         self.discriminator_network.load_state(discriminator_appendix)
@@ -77,11 +79,11 @@ class AdversarialNetwork(metaclass=ABCMeta):
         # alternate between training generator and discriminator
         while d_e < discriminator_epochs and g_e < generator_epochs:
             if d_e < discriminator_epochs:
-                LOGGER.info("Training discriminator network.")
+                LOGGER.info(f"Training discriminator network. [epochs {d_e}-{d_e+discriminator_stint} out of ({discriminator_epochs})]")
                 self.discriminator_network.train(discriminator_x, discriminator_y, self.discriminator_loss, discriminator_stint, discriminator_lr, discriminator_callbacks)
                 d_e += discriminator_stint
             if g_e < generator_epochs:
-                LOGGER.info("Training generator network.")
+                LOGGER.info(f"Training generator network. [epochs {g_e}-{g_e+generator_stint} out of ({generator_epochs})]")
                 self.generator_network.train(generator_x, generator_y, self.generator_loss, generator_stint, generator_lr, generator_callbacks)
                 g_e += generator_stint
 
