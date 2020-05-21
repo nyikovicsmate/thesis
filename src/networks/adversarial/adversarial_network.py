@@ -45,8 +45,10 @@ class AdversarialNetwork(metaclass=ABCMeta):
         return self.generator_network.predict(x, *args, **kwargs)
 
     def train(self,
-              x: Iterable,
-              y: Iterable,
+              generator_x: Iterable,
+              generator_y: Iterable,
+              discriminator_x: Iterable,
+              discriminator_y: Iterable,
               generator_epochs: int,
               discriminator_epochs: int,
               alternating_ratio: int,
@@ -68,20 +70,19 @@ class AdversarialNetwork(metaclass=ABCMeta):
             return result
 
         # keep separate copies of the datasets to make sure they stay in sync during the alternating trainig
-        x_gen = x.batch(20)
-        y_gen = y.batch(20)
-        x_disc = x.batch(20).map(predict_wrapper)
-        y_disc = y.batch(20)
+        assert generator_x is not discriminator_x, "Low res datasets `x` must to be unique for both the generator and the discriminator."
+        assert generator_y is not discriminator_y, "High res datasets `y` must to be unique for both the generator and the discriminator."
+        discriminator_x = discriminator_x.map(predict_wrapper)   # TODO: fix, this mapping approach only works if x is of type `Dataset`
 
         # alternate between training generator and discriminator
         while d_e < discriminator_epochs and g_e < generator_epochs:
             if d_e < discriminator_epochs:
                 LOGGER.info("Training discriminator network.")
-                self.discriminator_network.train(x_disc, y_disc, self.discriminator_loss, discriminator_stint, discriminator_lr, discriminator_callbacks)
+                self.discriminator_network.train(discriminator_x, discriminator_y, self.discriminator_loss, discriminator_stint, discriminator_lr, discriminator_callbacks)
                 d_e += discriminator_stint
             if g_e < generator_epochs:
                 LOGGER.info("Training generator network.")
-                self.generator_network.train(x_gen, y_gen, self.generator_loss, generator_stint, generator_lr, generator_callbacks)
+                self.generator_network.train(generator_x, generator_y, self.generator_loss, generator_stint, generator_lr, generator_callbacks)
                 g_e += generator_stint
 
     def evaluate(self, y, y_pred):
