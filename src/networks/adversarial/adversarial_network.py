@@ -27,6 +27,20 @@ class AdversarialNetwork(metaclass=ABCMeta):
     def discriminator_loss(self, y: tf.Tensor, y_pred: tf.Tensor):
         pass
 
+    def save_state(self,
+                   generator_appendix: str = "",
+                   discriminator_appendix: str = ""):
+        discriminator_appendix = f"_{str.lower(self.__class__.__name__)}" if discriminator_appendix == "" else discriminator_appendix
+        self.generator_network.save_state(generator_appendix)
+        self.discriminator_network.save_state(discriminator_appendix)
+
+    def load_state(self,
+                   generator_appendix: str = "",
+                   discriminator_appendix: str = ""):
+        discriminator_appendix = f"_{str.lower(self.__class__.__name__)}" if discriminator_appendix == "" else discriminator_appendix
+        self.generator_network.load_state(generator_appendix)
+        self.discriminator_network.load_state(discriminator_appendix)
+
     def predict(self, x: Iterable, *args, **kwargs):
         return self.generator_network.predict(x, *args, **kwargs)
 
