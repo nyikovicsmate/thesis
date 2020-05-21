@@ -28,18 +28,9 @@ class DiscriminatorNetwork(Network):
         y_pred = self.model(x)
         return y_pred
 
-    # TODO: uncomment in production
-    # @tf.function
     def _train_step(self, x, y, loss_func):
         y = tf.convert_to_tensor(y)
         with tf.GradientTape() as tape:
-            # fake_pred = self.model(x)
-            # loss_fake = loss_func(tf.zeros_like(fake_pred), self.model(x))
-            # real_pred = self.model(y)
-            # loss_real = loss_func(tf.ones_like(real_pred), real_pred)
-            # # y_pred = self.model(x)
-            # # loss = loss_func(y, y_pred)
-            # loss = loss_fake + loss_real
             y_pred = self.model(x)
             loss = loss_func(y, y_pred)
             grads = tape.gradient(loss, self.model.trainable_variables)

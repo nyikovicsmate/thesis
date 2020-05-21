@@ -43,10 +43,9 @@ class ProgressiveUpsamplingNetwork(Network):
         for y_pred in y_pred_list:
             if tuple(y_pred.shape[1:3]) == size:
                 LOGGER.info(f"Predicted images with shape: {y_pred.shape}")
-                return y_pred.numpy()
+                return y_pred
         LOGGER.warn(f"Couldn't predict.")
 
-    @tf.function
     def _train_step(self, x, y, loss_func):
         with tf.GradientTape() as tape:
             y_pred = self.model(x)
