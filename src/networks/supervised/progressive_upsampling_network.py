@@ -24,15 +24,13 @@ class ProgressiveUpsamplingNetwork(Network):
                                                   epsilon=1e-8)
 
     @staticmethod
-    @tf.function
+    # @tf.function
     def _charbonnier_loss(x: tf.Tensor):
         epsilon_square = tf.square(tf.constant(1e-4, dtype=tf.float32))
         return tf.sqrt(tf.square(x) + epsilon_square)
 
     @staticmethod
-    @tf.function
     def custom_loss(y_true, y_pred):
-        # TODO: convert to tf.function decorator ready state
         loss = 0
         for i in range(len(y_true)):
             N = tf.constant(len(y_true[i]), dtype=tf.float32)
@@ -49,16 +47,18 @@ class ProgressiveUpsamplingNetwork(Network):
         LOGGER.warn(f"Couldn't predict.")
 
     @tf.function
-    def _train_step(self, x, y):
+    def _train_step(self, x, y, loss_func):
         with tf.GradientTape() as tape:
             y_pred = self.model(x)
-            loss = ProgressiveUpsamplingNetwork.custom_loss(y, y_pred)
+            loss = loss_func(y, y_pred)
             grads = tape.gradient(loss, self.model.trainable_variables)
         self.optimizer.apply_gradients(zip(grads, self.model.trainable_variables))
         return loss
 
     def _train(self, x, y, loss_func, epochs, learning_rate, callbacks):
-        assert loss_func is None, "Reinforced network uses it's own loss function. Pass it `None`"
+        loss_func = ProgressiveUpsamplingNetwork.custom_loss if loss_func is None else loss_func
+        if loss_func is not ProgressiveUpsamplingNetwork.custom_loss:
+            LOGGER.warning("Progressive upsampling network got custom loss function, I better hope you know what you are doing.")
         self.learning_rate.assign(tf.constant(learning_rate, dtype=tf.float32))
         # train
         for e_idx in range(epochs):
@@ -66,7 +66,7 @@ class ProgressiveUpsamplingNetwork(Network):
             start_sec = time.time()
             # process a batch
             for x_b, *y_b in zip_longest(x, *y):
-                train_loss += self._train_step(x_b, y_b)
+                train_loss += self._train_step(x_b, y_b, loss_func)
             # update state
             delta_sec = time.time() - start_sec
             self.state.epochs += 1
