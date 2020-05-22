@@ -276,17 +276,20 @@ class Dataset(metaclass=ABCMeta):
         def _transform(self, img):
             if self._args["transform_id"] == 0:
                 self._args["transform_id"] += 1
+                return img
+            if self._args["transform_id"] == 1:
+                self._args["transform_id"] += 1
                 rot_90 = cv2.rotate(img, cv2.ROTATE_90_CLOCKWISE)
                 return rot_90
-            elif self._args["transform_id"] == 1:
+            elif self._args["transform_id"] == 2:
                 self._args["transform_id"] += 1
                 rot_180 = cv2.rotate(img, cv2.ROTATE_180)
                 return rot_180
-            elif self._args["transform_id"] == 2:
+            elif self._args["transform_id"] == 3:
                 self._args["transform_id"] += 1
                 rot_270 = cv2.rotate(img, cv2.ROTATE_90_COUNTERCLOCKWISE)
                 return rot_270
-            elif self._args["transform_id"] == 3:
+            elif self._args["transform_id"] == 4:
                 self._args["transform_id"] = 0
                 flip_vertical = cv2.flip(img, flipCode=0)
                 return flip_vertical
