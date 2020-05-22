@@ -83,7 +83,21 @@ feedback mechanism for projection errors.
 
 ---
 
-TODO
+For adversarial training I've constructed a classifier discriminator model consisting of TODO layers. 
+By incorporating the discriminator's loss into the aforementioned supervised leraning model's (in this context the 
+generators') training process, except from the pre-upsampling model all other models were able to attain a higher 
+evaluation rating. The following images are meant to illustrate the results, the values below the images are the 
+average PSNR and SSIM values, and their differences compared to the purely supervised trainig results evaluated 
+on [Set14](https://github.com/cszn/IRCNN/tree/master/testsets/Set14) dataset. 
+
+![results](https://raw.githubusercontent.com/nyikovicsmate/thesis/master/documentation/img/ad_r.png)
+
+```
+                                    SSIM    0.69 (-0.01)       0.60 (+0.00)       0.71 (+0.01)       0.65 (+0.00)
+                                    PSNR    20.55 (-0.15)     19.40 (+0.19)      20.98 (+0.30)      19.53 (+0.31)
+```
+
+
 
 #### Reinforcement
 
