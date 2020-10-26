@@ -118,7 +118,7 @@ class Network(ABC):
     def train(self,
               x: Iterable,
               y: Union[Iterable, List[Iterable]],
-              loss_func: Callable[[tf.Tensor, tf.Tensor], tf.Tensor],
+              loss_func: Optional[Callable[[tf.Tensor, tf.Tensor], tf.Tensor]],
               epochs: int,
               learning_rate: float = 1e-4,
               callbacks: Optional[List[Callback]] = None):

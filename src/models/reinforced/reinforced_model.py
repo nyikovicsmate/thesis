@@ -120,8 +120,8 @@ class ReinforcedModel(tf.keras.models.Model):
         x = self.diconv4(x)
         actor = self.actor_diconv5(x)
         actor = self.actor_diconv6(actor)
-        actor = self.actor_conv7(actor)  # output shape (batch_size, width, height, 9)
+        actor = self.actor_conv7(actor)  # output shape (batch_size, height, width, 9)
         critic = self.critic_diconv5(x)
         critic = self.critic_diconv6(critic)
-        critic = self.critic_conv7(critic)  # output shape (batch_size, width, height, 1)
+        critic = self.critic_conv7(critic)  # output shape (batch_size, height, width, 1)
         return actor, critic

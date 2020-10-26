@@ -1,12 +1,11 @@
 from itertools import zip_longest
-from typing import Optional, Tuple, Union, Callable
+from typing import Callable
 
 import numpy as np
 import tensorflow as tf
 
 from src.callbacks import OptimizerCallback, TrainIterationEndCallback
 from src.config import *
-from src.dataset import Dataset
 from src.models.reinforced.reinforced_model import ReinforcedModel
 from src.networks.network import Network
 from src.networks.reinforced.state import State
@@ -26,11 +25,13 @@ class ReinforcedNetwork(Network):
         if not isinstance(func, Callable):
             raise TypeError("Noise function must be an instance of `typing.Callable`.")
         if func.__code__.co_argcount != 1:
-            raise AttributeError(f"Noise function must have exactly 1 parameter, the image which to process. Got {func.__code__.co_varnames}")
+            raise AttributeError(
+                f"Noise function must have exactly 1 parameter, the image which to process. Got {func.__code__.co_varnames}")
         test_img = np.zeros(shape=(1, 10, 10, 3), dtype=np.float32)
         ret = func(test_img)
         if type(ret) is not np.ndarray and len(ret.shape) != 4:
-            raise TypeError("Noise function must return 4D numpy.ndarray type with (batch, height, width, channel) dimensions.")
+            raise TypeError(
+                "Noise function must return 4D numpy.ndarray type with (batch, height, width, channel) dimensions.")
         self._noise_func = func
 
     @staticmethod
@@ -82,14 +83,8 @@ class ReinforcedNetwork(Network):
                 a_t, _ = self.model(s_t0)
                 # sample the actions
                 sampled_a_t = self._sample_most_probable(a_t)
-                # TODO: Eliminate this back-and-forth conversion nonsense by converting State.update() function from NCHW to NHWC (channel first to channel last).
-                # convert to NCHW
-                s_t0_nchw = tf.transpose(s_t0, perm=[0, 3, 1, 2])
-                sampled_a_t_nchw = tf.transpose(sampled_a_t, perm=[0, 3, 1, 2])
                 # update the current state/image with the predicted actions
-                s_t1 = tf.convert_to_tensor(State.update(s_t0_nchw.numpy(), sampled_a_t_nchw.numpy()), dtype=tf.float32)
-                # convert the back to NHWC
-                s_t1 = tf.transpose(s_t1, perm=[0, 2, 3, 1])
+                s_t1 = tf.convert_to_tensor(State.update(s_t0.numpy(), sampled_a_t.numpy()), dtype=tf.float32)
                 s_t0 = s_t1
             result = s_t0 if result == None else tf.concat([result, s_t0], axis=3)
         LOGGER.info(f"Predicted images with shape: {result.shape}")
@@ -117,14 +112,8 @@ class ReinforcedNetwork(Network):
                 past_action_log_prob[t] = self._mylog_prob(a_t_log, sampled_a_t)
                 past_action_entropy[t] = self._myentropy(a_t, a_t_log)
                 V[t] = V_t
-                # TODO: Eliminate this back-and-forth conversion nonsense by converting State.update() function from NCHW to NHWC (channel first to channel last).
-                # convert to NCHW
-                s_t0_nchw = tf.transpose(s_t0, perm=[0, 3, 1, 2])
-                sampled_a_t_nchw = tf.transpose(sampled_a_t, perm=[0, 3, 1, 2])
                 # update the current state/image with the predicted actions
-                s_t1 = tf.convert_to_tensor(State.update(s_t0_nchw.numpy(), sampled_a_t_nchw.numpy()), dtype=tf.float32)
-                # convert the back to NHWC
-                s_t1 = tf.transpose(s_t1, perm=[0, 2, 3, 1])
+                s_t1 = tf.convert_to_tensor(State.update(s_t0.numpy(), sampled_a_t.numpy()), dtype=tf.float32)
                 r_t = self._mse(y, s_t0, s_t1)
                 r[t] = tf.cast(r_t, dtype=tf.float32)
                 s_t0 = s_t1
@@ -162,8 +151,10 @@ class ReinforcedNetwork(Network):
         assert loss_func is None, "Reinforced network uses it's own loss function. Pass it `None`"
         x_b = next(iter(x))
         y_b = next(iter(y))
-        assert x_b.shape[-1] == y_b.shape[-1] == 1, f"Reinforced network uses single channel images for trainig. Got x: {x_b.shape[-1]}, y: {y_b.shape[-1]}"
-        assert x_b.shape[1:3] == y_b.shape[1:3], f"Both datasets must have similarly sized images. Got x: {x_b.shape[1:3]}, y: {y_b.shape[1:3]}"
+        assert x_b.shape[-1] == y_b.shape[
+            -1] == 1, f"Reinforced network uses single channel images for trainig. Got x: {x_b.shape[-1]}, y: {y_b.shape[-1]}"
+        assert x_b.shape[1:3] == y_b.shape[
+                                 1:3], f"Both datasets must have similarly sized images. Got x: {x_b.shape[1:3]}, y: {y_b.shape[1:3]}"
         learning_rate = tf.Variable(learning_rate)  # wrap variable according to callbacks.py:25
         optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate,
                                              beta_1=0.9,
