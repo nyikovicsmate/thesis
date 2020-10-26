@@ -1,51 +1,71 @@
 from abc import ABC, abstractmethod
-import numpy as np
-import cv2
+from typing import Tuple
 
-from src.kernel import *
+import cv2
+import numpy as np
 
 
 class Action(ABC):
+    def __init__(self, img: np.ndarray):
+        self._img = np.array(img, dtype=np.float32)
+        self._processed_img = None
+
+    @property
+    def processed_img(self) -> np.ndarray:
+        if self._processed_img is None:
+            self._processed_img = np.reshape(self._process(), self._img.shape)
+        return self._processed_img
+
     @abstractmethod
-    def apply(self,
-              img: np.ndarray,
-              i: int,
-              j: int) -> np.float32:
-        """
-        // TODO
-        :param img: [0,1] scaled image pixel mx
-        :param i: y coordinate [0,m]
-        :param j: x coordinate [0,n]
-        :return:
-        """
-        raise NotImplementedError()
+    def _process(self) -> np.ndarray:
+        pass
 
 
-class DoNothing(Action):
-    def apply(self, img: np.ndarray, i: int, j: int) -> np.float32:
-        return img[i, j]
+class AlterByValue(Action):
+    def __init__(self, img, value):
+        super().__init__(img)
+        self._value = value
+
+    def _process(self) -> np.ndarray:
+        return np.array(self._img + self._value, dtype=np.float32)
 
 
-class IncrementByOne(Action):
-    def apply(self, img: np.ndarray, i: int, j: int) -> np.float32:
-        return img[i, j] + (1.0 / 255.0)
+class GaussianBlur(Action):
+    def __init__(self, img: np.ndarray, ksize: Tuple[int, int], sigmaX: float):
+        super().__init__(img)
+        self._ksize = ksize
+        self._sigmaX = sigmaX
+
+    def _process(self) -> np.ndarray:
+        return cv2.GaussianBlur(self._img, ksize=self._ksize, sigmaX=self._sigmaX)
 
 
-class DecrementByOne(Action):
-    def apply(self, img: np.ndarray, i: int, j: int) -> np.float32:
-        return img[i, j] - (1.0 / 255.0)
+class BilaterFilter(Action):
+    def __init__(self, img: np.ndarray, d: int, sigma_color: float, sigma_space: float):
+        super().__init__(img)
+        self._d = d
+        self._sigma_color = sigma_color
+        self._sigma_space = sigma_space
+
+    def _process(self) -> np.ndarray:
+        return cv2.bilateralFilter(self._img, d=self._d, sigmaColor=self._sigma_color,
+                                                  sigmaSpace=self._sigma_space)
 
 
-class Gaussian1(Action):
-    _kernel = GaussianKernel(size=(5,5), sigma=0.5)
+class BoxFilter(Action):
+    def __init__(self, img: np.ndarray, ddepth: int, ksize: Tuple[int, int]):
+        super().__init__(img)
+        self._ddepth = ddepth
+        self._ksize = ksize
 
-    def apply(self, img: np.ndarray, i: int, j: int) -> np.float32:
-        return self._kernel.apply_to_region(img, i, j)
+    def _process(self) -> np.ndarray:
+        return cv2.boxFilter(self._img, ddepth=self._ddepth, ksize=self._ksize)
 
 
-class Gaussian2(Action):
-    _kernel = GaussianKernel(size=(5,5), sigma=1.5)
+class MedianBlur(Action):
+    def __init__(self, img: np.ndarray, ksize: int):
+        super().__init__(img)
+        self._ksize = ksize
 
-    def apply(self, img: np.ndarray, i: int, j: int) -> np.float32:
-        return self._kernel.apply_to_region(img, i, j)
-
+    def _process(self) -> np.ndarray:
+        return cv2.medianBlur(self._img, ksize=self._ksize)
