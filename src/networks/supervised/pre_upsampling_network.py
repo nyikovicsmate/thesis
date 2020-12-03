@@ -1,15 +1,13 @@
-import contextlib
 from itertools import zip_longest
-from typing import Tuple, Optional, Union
+from typing import Tuple, Optional
 
-import tensorflow as tf
 import numpy as np
+import tensorflow as tf
 
-from src.config import *
-from src.dataset import Dataset
 from src.callbacks import OptimizerCallback, TrainIterationEndCallback
-from src.networks.network import Network
+from src.config import *
 from src.models.supervised.pre_upsampling_model import PreUpsamplingModel
+from src.networks.network import Network
 
 
 class PreUpsamplingNetwork(Network):
@@ -26,7 +24,7 @@ class PreUpsamplingNetwork(Network):
     def _predict(self, x: tf.Tensor, *args, **kwargs) -> tf.Tensor:
         size = self._parse_predict_optionals(x, args, kwargs)
         x = tf.image.resize(x, size, tf.image.ResizeMethod.BICUBIC)
-        y_pred = self.model(x).numpy()
+        y_pred = self.model(x)
         LOGGER.info(f"Predicted images with shape: {y_pred.shape}")
         return y_pred
 

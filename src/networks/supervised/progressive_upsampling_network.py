@@ -1,15 +1,13 @@
-import contextlib
 from itertools import zip_longest
-from typing import Tuple, List, Optional, Union, Iterable
+from itertools import zip_longest
+from typing import Tuple, Optional
 
 import tensorflow as tf
-import numpy as np
 
-from src.config import *
-from src.dataset import Dataset
 from src.callbacks import OptimizerCallback, TrainIterationEndCallback
-from src.networks.network import Network
+from src.config import *
 from src.models.supervised.progressive_upsampling_model import ProgressiveUpsamplingModel
+from src.networks.network import Network
 
 
 class ProgressiveUpsamplingNetwork(Network):

@@ -1,15 +1,13 @@
-import contextlib
 from itertools import zip_longest
-from typing import Tuple, Optional, Union
+from typing import Tuple, Optional
 
-import tensorflow as tf
 import numpy as np
+import tensorflow as tf
 
-from src.config import *
-from src.dataset import Dataset
 from src.callbacks import OptimizerCallback, TrainIterationEndCallback
-from src.networks.network import Network
+from src.config import *
 from src.models.supervised.iterative_sampling_model import IterativeSamplingModel
+from src.networks.network import Network
 
 
 class IterativeSamplingNetwork(Network):
