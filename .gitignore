@@ -1,3 +1,6 @@
+# evaluation content
+evaluations/
+
 # developmen datasets
 bsd500_*_gray.h5
 bsd500_*_color.h5

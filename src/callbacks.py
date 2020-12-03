@@ -1,6 +1,10 @@
+import pathlib
 from abc import ABCMeta
+from typing import Iterable, Union
 
-from src.config import LOGGER
+import cv2
+
+from src.config import LOGGER, ROOT_PATH
 
 
 class Callback(metaclass=ABCMeta):
@@ -210,3 +214,51 @@ class TrainingCheckpointCallback(TrainIterationEndCallback):
         # checks passed, save the model
         LOGGER.info(f"Saving state after {inst.state.epochs} epochs.")
         inst.save_state(self._appendix)
+
+class TrainingEvaluationCallback(TrainIterationEndCallback):
+
+    def __init__(self,
+                 x: Iterable,
+                 y: Iterable,
+                 dest_dir: Union[str, pathlib.Path] = "./evaluations",
+                 save_freq: int = 10,
+                 *args,
+                 **kwargs):
+        """
+        Callback for evaluating the model after `save_freq` number of epochs. At every trigger
+        it feeds the values from the `x` parameter into the present state of the model. The results
+        of the prediction are then compared with `y` using various metrics (see `Network.evaluate`),
+        and get stored under `dest_dir` directory path.
+
+        :param x: The LR dataset to use for evaluation. Must be iterable.
+        :param y: The HR dataset to use for evaluation. Must be iterable. Must have the same number of items as `x`.
+        :param dest_dir: The output directory for the predicted images. Relative to project directory (default: ./evaluations).
+        :param save_freq: number of epochs between each checkpoint (default: 10).
+        :param args, kwargs: Optional arguments for predictions. See `Network.predict` on usage.
+
+        """
+
+        self._x = x
+        self._y = y
+        self._dest_dir = ROOT_PATH.joinpath(dest_dir)
+        self._save_freq = save_freq
+        self._args = args
+        self._kwargs = kwargs
+
+    def call(self, inst):
+        # don't evaluate if it's not time yet
+        if inst.state.epochs <= 0 or inst.state.epochs % self._save_freq != 0:
+            return
+        # validate that the dest_dir directory exists, create if necessary
+        if not self._dest_dir.exists() or not self._dest_dir.is_dir():
+            LOGGER.warning(f"Model directory {self._dest_dir} does not exist. Creating it.")
+            self._dest_dir.mkdir(parents=True, exist_ok=False)
+
+        y_pred = inst.predict(self._x)
+        metrics = inst.evaluate(y_pred, self._y)
+        # persist results
+        with open(str(self._dest_dir.joinpath("eval.log")), mode="a+", encoding="utf8") as logfile:
+            logfile.write(f"epoch: {inst.state.epochs} loss: {inst.state.train_loss} train_time: {inst.state.train_time}")
+            logfile.write(str(metrics))
+        for i, img in enumerate(y_pred.numpy()):
+            cv2.imwrite(str(self._dest_dir.joinpath(f"{inst.state.epochs}_{i}.png")), img*255.0)

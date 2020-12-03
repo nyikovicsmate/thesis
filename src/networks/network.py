@@ -195,18 +195,24 @@ class Network(ABC):
         return size
 
     @staticmethod
-    def evaluate(y_pred: np.ndarray, y_true: np.ndarray) -> List[Dict[str, float]]:
+    def evaluate(y_pred: Iterable, y_true: Iterable) -> List[Dict[str, float]]:
         """
         :param y_pred: The corresponding batch of predicted images.
         :param y_true: The batch of HR images.
         :return: A dictionary of metrics (ssim, psnr, total_variation, mean_squared_error, mean_absolute_error)
                  for each image in the array.
         """
+        if isinstance(y_pred, Dataset):
+            with y_pred:
+                y_pred = next(iter(y_pred))
+        if isinstance(y_true, Dataset):
+            with y_true:
+                y_true = next(iter(y_true))
         _len = len(y_pred)
         assert _len == len(y_true)
-        result = []
         y_true_tensor = tf.convert_to_tensor(y_true, dtype=tf.float32)
         y_pred_tensor = tf.convert_to_tensor(y_pred, dtype=tf.float32)
+        result = []
         for i in range(_len):
             _dict = {}
             _dict["ssim"] = tf.image.ssim(y_true_tensor[i], y_pred_tensor[i], max_val=1).numpy()
