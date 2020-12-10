@@ -1,17 +1,18 @@
 # evaluation content
 evaluations/
 
-# developmen datasets
-bsd500_*_gray.h5
-bsd500_*_color.h5
-set14_*_gray/
-set14_*_color/
-
 # resarch files
 resarch/
+reports/
+documentation/
+
+datasets/
 
 # local run configurations
 src/train*.py
+
+# temporary files
+temp/
 
 # Editors
 .idea/
