@@ -68,12 +68,12 @@ class ReinforcedNetwork(Network):
     def __init__(self):
         model = ReinforcedModel()
         super().__init__(model)
-        self._steps_per_episode = 5
+        self._steps_per_episode = 7
         self._discount_factor = 0.95
         self._noise_func = ReinforcedNetwork._normalized_noise_func
 
     def _predict(self, x: tf.Tensor, *args, **kwargs) -> tf.Tensor:
-        size = self._parse_predict_optionals(x, args, kwargs)  # keep it for the logs
+        self._parse_predict_optionals(x, args, kwargs)  # keep it for the logs
         x = tf.convert_to_tensor(self.noise_func(x.numpy()))
         s_t0_channels = tf.split(x, num_or_size_splits=x.shape[-1], axis=3)
         result = None
@@ -88,14 +88,14 @@ class ReinforcedNetwork(Network):
                 s_t0 = s_t1
             result = s_t0 if result == None else tf.concat([result, s_t0], axis=3)
         LOGGER.info(f"Predicted images with shape: {result.shape}")
-        return result.numpy()
+        return result
 
     # @tf.function
     # TODO: Make it tf.function decorator ready
     def _train_step(self, x, y, optimizer):
         s_t0 = tf.convert_to_tensor(x)
         y = tf.convert_to_tensor(y)
-        episode_r = 0
+        # episode_r = 0
         r = {}  # reward
         V = {}  # expected total rewards from state
         past_action_log_prob = {}
@@ -110,40 +110,41 @@ class ReinforcedNetwork(Network):
                 a_t = tf.clip_by_value(a_t, 1e-6, 1)
                 a_t_log = tf.math.log(a_t)
                 past_action_log_prob[t] = self._mylog_prob(a_t_log, sampled_a_t)
-                past_action_entropy[t] = self._myentropy(a_t, a_t_log)
+                # past_action_log_prob[t] = tf.math.log(self._mylog_prob(a_t, sampled_a_t))
+                # past_action_entropy[t] = self._myentropy(a_t, a_t_log)
                 V[t] = V_t
                 # update the current state/image with the predicted actions
                 s_t1 = tf.convert_to_tensor(State.update(s_t0.numpy(), sampled_a_t.numpy()), dtype=tf.float32)
                 r_t = self._mse(y, s_t0, s_t1)
                 r[t] = tf.cast(r_t, dtype=tf.float32)
                 s_t0 = s_t1
-                episode_r += tf.reduce_mean(r_t) * tf.math.pow(self._discount_factor, t)
+                # episode_r += tf.reduce_mean(r_t) * tf.math.pow(self._discount_factor, t)
 
             R = 0
             actor_loss = 0
             critic_loss = 0
-            beta = 1e-2
+            # beta = 1e-2
             for t in reversed(range(self._steps_per_episode)):
                 R *= self._discount_factor
                 R += r[t]
                 A = R - V[t]  # advantage
                 # Accumulate gradients of policy
                 log_prob = past_action_log_prob[t]
-                entropy = past_action_entropy[t]
+                # entropy = past_action_entropy[t]
 
                 # Log probability is increased proportionally to advantage
                 actor_loss -= log_prob * A
                 # Entropy is maximized
-                actor_loss -= beta * entropy
-                actor_loss *= 0.5  # multiply loss by 0.5 coefficient
+                # actor_loss -= beta * entropy
+                # actor_loss *= 0.5  # multiply loss by 0.5 coefficient
                 # Accumulate gradients of value function
-                critic_loss += (R - V[t]) ** 2 / 2
+                critic_loss += A ** 2
 
             total_loss = tf.reduce_mean(actor_loss + critic_loss)
-            actor_grads = tape.gradient(total_loss, self.model.trainable_variables)
-        optimizer.apply_gradients(zip(actor_grads, self.model.trainable_variables))
+            grads = tape.gradient(total_loss, self.model.trainable_variables)
+        optimizer.apply_gradients(zip(grads, self.model.trainable_variables))
 
-        return episode_r, total_loss
+        return tf.reduce_mean(R), total_loss
 
     def _train(self, x, y, loss_func, epochs, learning_rate, callbacks):
         assert len(y) == 1, "Reinforced network can only be trained with single dataset."
@@ -151,10 +152,10 @@ class ReinforcedNetwork(Network):
         assert loss_func is None, "Reinforced network uses it's own loss function. Pass it `None`"
         x_b = next(iter(x))
         y_b = next(iter(y))
-        assert x_b.shape[-1] == y_b.shape[
-            -1] == 1, f"Reinforced network uses single channel images for trainig. Got x: {x_b.shape[-1]}, y: {y_b.shape[-1]}"
-        assert x_b.shape[1:3] == y_b.shape[
-                                 1:3], f"Both datasets must have similarly sized images. Got x: {x_b.shape[1:3]}, y: {y_b.shape[1:3]}"
+        assert x_b.shape[-1] == y_b.shape[-1] == 1, \
+            f"Reinforced network uses single channel images for trainig. Got dimensions x: {x_b.shape[-1]}, y: {y_b.shape[-1]}"
+        assert x_b.shape[1:3] == y_b.shape[1:3], \
+            f"Both datasets must have similarly sized images. Got shapes x: {x_b.shape[1:3]}, y: {y_b.shape[1:3]}"
         learning_rate = tf.Variable(learning_rate)  # wrap variable according to callbacks.py:25
         optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate,
                                              beta_1=0.9,
@@ -162,11 +163,14 @@ class ReinforcedNetwork(Network):
                                              epsilon=1e-8)
         # train
         for e_idx in range(epochs):
+            episode_r = tf.constant(0, dtype=tf.float32)
             train_loss = tf.constant(0, dtype=tf.float32)
             start_sec = time.time()
             # process a batch
             for x_b, y_b in zip_longest(x, y):
-                episode_r, train_loss = self._train_step(self.noise_func(x_b), y_b, optimizer)
+                reward, loss = self._train_step(self.noise_func(x_b), y_b, optimizer)
+                episode_r += reward
+                train_loss += loss
             # update state
             delta_sec = time.time() - start_sec
             self.state.epochs += 1
@@ -183,7 +187,7 @@ class ReinforcedNetwork(Network):
 
     @staticmethod
     @tf.function
-    def _mse(a, b, c):
+    def _mse(a, b, c) -> tf.Tensor:
         """
         Calculates the mean squared error for image batches given by the formula:
         mse = (a-b)**2 - (a-c)**2
@@ -192,8 +196,7 @@ class ReinforcedNetwork(Network):
         :param c:
         :return:
         """
-        mse = tf.math.square(a - b) * 255
-        mse -= tf.math.square(a - c) * 255
+        mse = tf.math.divide(tf.math.square(a - b) - tf.math.square(a - c), tf.clip_by_value(a, 1e-6, 1))
         return mse
 
     @staticmethod
@@ -237,7 +240,7 @@ class ReinforcedNetwork(Network):
 
     @staticmethod
     @tf.function
-    def _sample_random(distribution):
+    def _sample_random(distribution) -> tf.Tensor:
         """
         Samples the image action distribution returned by the last softmax activation.
         :param distribution: A 4D array with probability distributions shaped (batch_size, height, width, samples)
@@ -251,7 +254,7 @@ class ReinforcedNetwork(Network):
 
     @staticmethod
     @tf.function
-    def _sample_most_probable(distribution):
+    def _sample_most_probable(distribution) -> tf.Tensor:
         """
         Samples the image action distribution returned by the last softmax activation by returning the
         most probable action indexes from samples.
