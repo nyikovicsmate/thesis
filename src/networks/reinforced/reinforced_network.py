@@ -107,10 +107,10 @@ class ReinforcedNetwork(Network):
                 # sample the actions
                 sampled_a_t = self._sample_random(a_t)
                 # clip distribution into range to avoid 0 values, which cause problem with calculating logarithm
-                a_t = tf.clip_by_value(a_t, 1e-6, 1)
-                a_t_log = tf.math.log(a_t)
-                past_action_log_prob[t] = self._mylog_prob(a_t_log, sampled_a_t)
-                # past_action_log_prob[t] = tf.math.log(self._mylog_prob(a_t, sampled_a_t))
+                # a_t = tf.clip_by_value(a_t, 1e-6, 1)
+                # a_t_log = tf.math.log(a_t)
+                # past_action_log_prob[t] = self._mylog_prob(a_t_log, sampled_a_t)
+                past_action_log_prob[t] = tf.math.log(self._mylog_prob(a_t, sampled_a_t))
                 # past_action_entropy[t] = self._myentropy(a_t, a_t_log)
                 V[t] = V_t
                 # update the current state/image with the predicted actions
@@ -196,7 +196,8 @@ class ReinforcedNetwork(Network):
         :param c:
         :return:
         """
-        mse = tf.math.divide(tf.math.square(a - b) - tf.math.square(a - c), tf.clip_by_value(a, 1e-6, 1))
+        mse = tf.math.square(a - b) - tf.math.square(a - c)
+        mse *= 255.0
         return mse
 
     @staticmethod
