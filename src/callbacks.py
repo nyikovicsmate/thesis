@@ -3,6 +3,7 @@ from abc import ABCMeta
 from typing import Iterable, Union
 
 import cv2
+import json
 
 from src.config import LOGGER, ROOT_PATH
 
@@ -215,6 +216,7 @@ class TrainingCheckpointCallback(TrainIterationEndCallback):
         LOGGER.info(f"Saving state after {inst.state.epochs} epochs.")
         inst.save_state(self._appendix)
 
+
 class TrainingEvaluationCallback(TrainIterationEndCallback):
 
     def __init__(self,
@@ -257,8 +259,26 @@ class TrainingEvaluationCallback(TrainIterationEndCallback):
         y_pred = inst.predict(self._x)
         metrics = inst.evaluate(y_pred, self._y)
         # persist results
-        with open(str(self._dest_dir.joinpath("eval.log")), mode="a+", encoding="utf8") as logfile:
-            logfile.write(f"epoch: {inst.state.epochs} loss: {inst.state.train_loss} train_time: {inst.state.train_time}")
-            logfile.write(str(metrics))
+        file = self._dest_dir.joinpath("eval.json")
+        contents = {}
+        if file.exists():
+            with open(str(file), mode="r") as logfile:
+                contents = json.load(logfile)
+        metrics_json = []
+        for item in metrics:
+            t = {}
+            for k, v in item.items():
+                t[k] = str(v)
+            metrics_json.append(t)
+        contents[inst.state.epochs] = {
+            "train_loss": str(inst.state.train_loss),
+            "train_time": str(inst.state.train_time),
+            "metrics": metrics_json
+        }
+        with open(str(self._dest_dir.joinpath("eval.json")), mode="w") as logfile:
+            # logfile.write(f"epoch: {inst.state.epochs} loss: {inst.state.train_loss} train_time: {inst.state.train_time}")
+            # logfile.write(str(metrics))
+            json.dump(contents, logfile, indent=4)
+
         for i, img in enumerate(y_pred.numpy()):
             cv2.imwrite(str(self._dest_dir.joinpath(f"{inst.state.epochs}_{i}.png")), img*255.0)

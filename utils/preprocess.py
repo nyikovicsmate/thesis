@@ -3,6 +3,7 @@ Preprocessing script.
 
 usage: preprocess.py [-h] [-a AUGMENT_VALUE] [-f {png,hdf,lmdb}] [-g]
                      [-m {clip,clip_rnd,scale,scale_rnd}] [-s SIZE SIZE]
+                     [--scales SCALES [SCALES ...]]
                      [dst] [src [src ...]]
 
 positional arguments:
@@ -29,6 +30,16 @@ optional arguments:
   -s SIZE SIZE, --size SIZE SIZE
                         Output size of images [height, width]. (default: [70,
                         70])
+  --scales SCALES [SCALES ...]
+                        List of output image scales. (default: [1])
+
+
+clip: you clip a (-s <height> <width>) region out of the image and the start of the region is anchored
+      to the top left corner of the image
+clip_rnd: same as clip, but the region is randomly moved across the image
+scale: you take the largest portion of the image which has the same aspect ratio as your region,
+       and then downscale it to size
+scale_rnd: same as scale, but the portion of the image is chosen randomly
 
 """
 import argparse
@@ -114,7 +125,6 @@ class Store(ABC):
 class PNGStore(Store):
     def __init__(self, path: pathlib.Path, augment: bool):
         super().__init__(path, augment)
-        self.path = path
         self.images_path = self.path.joinpath("images")
         self.augmented_images_path = self.path.joinpath("augmented_images")
 
@@ -203,6 +213,7 @@ class Processor:
                  grayscale: bool,
                  method: Callable[[Image, Tuple[int, int]], Image],
                  size: Tuple[int, int],
+                 scales: List[int],
                  dst: pathlib.Path,
                  src: List[pathlib.Path]):
         self.supported_extensions: List[str] = ["jpg", "png", "dng"]
@@ -211,6 +222,7 @@ class Processor:
         self.grayscale = grayscale
         self.method = method
         self.size = size
+        self.scales = scales
         self.dst = dst
         self.src = src
 
@@ -221,30 +233,39 @@ class Processor:
         image_cnt = len(paths)
         print(f"Found {image_cnt} images.")
 
-        store = None
         augment = True if 0 <= self.augment_value <= 255 else False
-        if format == "png":
-            store = PNGStore(self.dst, augment)
-        elif format == "hdf":
-            dataset_shape = (image_cnt, *self.size) if self.grayscale else (image_cnt, *self.size, 3)
-            store = HDFStore(self.dst, augment, dataset_shape)
-        elif format == "lmdb":
-            dataset_shape = (image_cnt, *self.size) if self.grayscale else (image_cnt, *self.size, 3)
-            store = LMDBStore(self.dst, augment, dataset_shape)
+        for scale in reversed(self.scales):
+            size = (self.size[0] * scale, self.size[1] * scale)
+            dst = "{}_{}_{}".format(self.dst.absolute(), *size)
+            dst = pathlib.Path(dst).absolute()
+            print(f"Processing & saving images under:{chr(10)}{dst}")
+            if format == "png":
+                store = PNGStore(dst, augment)
+            elif format == "hdf":
+                dataset_shape = (image_cnt, *size) if self.grayscale else (image_cnt, *size, 3)
+                store = HDFStore(dst, augment, dataset_shape)
+            elif format == "lmdb":
+                dataset_shape = (image_cnt, *size) if self.grayscale else (image_cnt, *size, 3)
+                store = LMDBStore(dst, augment, dataset_shape)
+            else:
+                raise RuntimeError("Expected to have a store instance by now.")
 
-        print(f"Processing & saving images under:{chr(10)}{store.path}")
-        with tqdm(total=image_cnt) as pbar:
-            for i, path in enumerate(paths):
-                image = Image(path)
-                # process image
-                image = self.method(image, self.size)
-                if self.grayscale:
-                    image.grayscale()
-                if augment:
-                    augmented_image = image.augment(self.augment_value)
-                    store.store_augmented(i, augmented_image)
-                store.store(i, image)
-                pbar.update(1)
+            with tqdm(total=image_cnt) as pbar:
+                for i, path in enumerate(paths):
+                    try:
+                        image = Image(path)
+                        # process image
+                        image = self.method(image, size)
+                        if self.grayscale:
+                            image.grayscale()
+                        if augment:
+                            augmented_image = image.augment(self.augment_value)
+                            store.store_augmented(i, augmented_image)
+                        store.store(i, image)
+                        pbar.update(1)
+                    except RuntimeError as e:
+                        paths.remove(path)
+                        print(e)
         print("Done.")
 
     def _get_image_paths(self) -> List[pathlib.Path]:
@@ -267,10 +288,12 @@ class Processor:
 
     @staticmethod
     def _clip(image: Image, size: Tuple[int, int], random: bool) -> Image:
-        # resize image if necessary
+        # # resize image if necessary
+        # if image.size[0] < size[0] or image.size[1] < size[1]:
+        #     resize_factor = np.maximum(size[0] / image.size[0], size[1] / image.size[1])
+        #     image.resize(tuple(np.ceil(image.size * resize_factor)))
         if image.size[0] < size[0] or image.size[1] < size[1]:
-            resize_factor = np.maximum(size[0] / image.size[0], size[1] / image.size[1])
-            image.resize(tuple(np.ceil(image.size * resize_factor)))
+            raise RuntimeError(f"Input image '{image.path}' too small")
         h_idx = 0
         w_idx = 0
         if random:
@@ -333,6 +356,8 @@ if __name__ == '__main__':
                         help="Processing method to use. (default: %(default)s)")
     parser.add_argument("-s", "--size", dest="size", action="store", default=[70, 70], nargs=2, type=int,
                         help="Output size of images [height, width]. (default: %(default)s)")
+    parser.add_argument("--scales", dest="scales", action="store", default=[1], nargs="+", type=int,
+                        help="List of output image scales. (default: %(default)s)")
     parser.add_argument("dst", action="store", default="./dataset", type=str, nargs="?",
                         help="Name of the output file/directory. Can also be path e.g.: './results_png' or "
                              "'./a/b/hdf.h5'. (default: '%(default)s')")
@@ -351,8 +376,9 @@ if __name__ == '__main__':
              Processor.scale_rnd if args.method == "scale_rnd" else \
              None
     size = tuple(args.size)
+    scales = args.scales
     dst = pathlib.Path(args.dst).absolute()
     src = [pathlib.Path(s).absolute() for s in args.src]
 
-    p = Processor(augment_value, format, grayscale, method, size, dst, src)
+    p = Processor(augment_value, format, grayscale, method, size, scales, dst, src)
     p.process()

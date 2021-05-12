@@ -15,13 +15,13 @@ class PreUpsamplingModel(tf.keras.models.Model):
         super().__init__()
         self.conv_0 = tf.keras.layers.Conv2D(input_shape=input_shape,
                                              filters=64,  # optimum filter number (see TABLE 1)
-                                             kernel_size=9,  # optimum filter size (see Fig. 1)
+                                             kernel_size=8,  # optimum filter size (see Fig. 1)
                                              strides=1,
                                              padding="same",
                                              data_format="channels_last",
                                              use_bias=True,
                                              dilation_rate=1,
-                                             activation="linear",
+                                             activation="relu",
                                              kernel_initializer=tf.keras.initializers.he_uniform(),
                                              bias_initializer=tf.keras.initializers.Zeros())
         self.act_0 = tf.keras.layers.PReLU(alpha_initializer=tf.keras.initializers.Zeros())
@@ -32,7 +32,7 @@ class PreUpsamplingModel(tf.keras.models.Model):
                                              data_format="channels_last",
                                              use_bias=True,
                                              dilation_rate=1,
-                                             activation="linear",
+                                             activation="relu",
                                              kernel_initializer=tf.keras.initializers.he_uniform(),
                                              bias_initializer=tf.keras.initializers.Zeros())
         self.act_1 = tf.keras.layers.PReLU(alpha_initializer=tf.keras.initializers.Zeros())
@@ -43,7 +43,7 @@ class PreUpsamplingModel(tf.keras.models.Model):
                                              data_format="channels_last",
                                              use_bias=True,
                                              dilation_rate=1,
-                                             activation="linear",
+                                             activation="relu",
                                              kernel_initializer=tf.keras.initializers.he_uniform(),
                                              bias_initializer=tf.keras.initializers.Zeros())
         self.act_2 = tf.keras.layers.PReLU(alpha_initializer=tf.keras.initializers.Zeros())

@@ -1,48 +1,0 @@
-å2Ü©Y
-E
-
-conv_0
-	act_0
-
-conv_1
-	act_1
-
-conv_2
-	act_2
-
-
-kernel
-bias
-
-		alpha
-
-
-
-kernel
-bias
-
-	alpha
-
-
-kernel
-bias
-
-	alpha
-KI
-VARIABLE_VALUEconv2d/kernel(conv_0/kernel/.ATTRIBUTES/VARIABLE_VALUE
-GE
-VARIABLE_VALUEconv2d/bias&conv_0/bias/.ATTRIBUTES/VARIABLE_VALUE
-IG
-VARIABLE_VALUEp_re_lu/alpha&act_0/alpha/.ATTRIBUTES/VARIABLE_VALUE
-MK
-VARIABLE_VALUEconv2d_1/kernel(conv_1/kernel/.ATTRIBUTES/VARIABLE_VALUE
-IG
-VARIABLE_VALUEconv2d_1/bias&conv_1/bias/.ATTRIBUTES/VARIABLE_VALUE
-KI
-VARIABLE_VALUEp_re_lu_1/alpha&act_1/alpha/.ATTRIBUTES/VARIABLE_VALUE
-MK
-VARIABLE_VALUEconv2d_2/kernel(conv_2/kernel/.ATTRIBUTES/VARIABLE_VALUE
-IG
-VARIABLE_VALUEconv2d_2/bias&conv_2/bias/.ATTRIBUTES/VARIABLE_VALUE
-KI
-VARIABLE_VALUEp_re_lu_2/alpha&act_2/alpha/.ATTRIBUTES/VARIABLE_VALUE

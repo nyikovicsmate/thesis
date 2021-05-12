@@ -11,7 +11,7 @@ from src.networks.network import Network
 
 
 class AdversarialNetwork(metaclass=ABCMeta):
-    """Abstract base class for adversarial trainig wrapper classes."""
+    """Abstract base class for adversarial training wrapper classes."""
 
     def __init__(self,
                  generator_network: Network,

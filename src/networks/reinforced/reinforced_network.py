@@ -133,7 +133,7 @@ class ReinforcedNetwork(Network):
                 # entropy = past_action_entropy[t]
 
                 # Log probability is increased proportionally to advantage
-                actor_loss -= log_prob * A
+                actor_loss += -log_prob * A
                 # Entropy is maximized
                 # actor_loss -= beta * entropy
                 # actor_loss *= 0.5  # multiply loss by 0.5 coefficient
@@ -153,7 +153,7 @@ class ReinforcedNetwork(Network):
         x_b = next(iter(x))
         y_b = next(iter(y))
         assert x_b.shape[-1] == y_b.shape[-1] == 1, \
-            f"Reinforced network uses single channel images for trainig. Got dimensions x: {x_b.shape[-1]}, y: {y_b.shape[-1]}"
+            f"Reinforced network uses single channel images for training. Got dimensions x: {x_b.shape[-1]}, y: {y_b.shape[-1]}"
         assert x_b.shape[1:3] == y_b.shape[1:3], \
             f"Both datasets must have similarly sized images. Got shapes x: {x_b.shape[1:3]}, y: {y_b.shape[1:3]}"
         learning_rate = tf.Variable(learning_rate)  # wrap variable according to callbacks.py:25
@@ -170,7 +170,7 @@ class ReinforcedNetwork(Network):
             for x_b, y_b in zip_longest(x, y):
                 reward, loss = self._train_step(self.noise_func(x_b), y_b, optimizer)
                 episode_r += reward
-                train_loss += loss
+                train_loss += loss 
             # update state
             delta_sec = time.time() - start_sec
             self.state.epochs += 1

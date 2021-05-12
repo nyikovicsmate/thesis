@@ -214,12 +214,13 @@ class Network(ABC):
         y_pred_tensor = tf.convert_to_tensor(y_pred, dtype=tf.float32)
         result = []
         for i in range(_len):
-            _dict = {}
-            _dict["ssim"] = tf.image.ssim(y_true_tensor[i], y_pred_tensor[i], max_val=1).numpy()
-            _dict["total_variation"] = tf.image.total_variation(y_pred_tensor[i]).numpy()
-            _dict["psnr"] = tf.image.psnr(y_true_tensor[i], y_pred_tensor[i], max_val=1).numpy()
-            _dict["mean_squared_error"] = np.sum(tf.losses.mean_squared_error(y_true_tensor[i], y_pred_tensor[i]).numpy())
-            _dict["mean_absolute_error"] = np.sum(tf.losses.mean_absolute_error(y_true_tensor[i], y_pred_tensor[i]).numpy())
+            _dict = {"ssim": tf.image.ssim(y_true_tensor[i], y_pred_tensor[i], max_val=1).numpy(),
+                     "total_variation": tf.image.total_variation(y_pred_tensor[i]).numpy(),
+                     "psnr": tf.image.psnr(y_true_tensor[i], y_pred_tensor[i], max_val=1).numpy(),
+                     "mean_squared_error": np.sum(
+                         tf.losses.mean_squared_error(y_true_tensor[i], y_pred_tensor[i]).numpy()),
+                     "mean_absolute_error": np.sum(
+                         tf.losses.mean_absolute_error(y_true_tensor[i], y_pred_tensor[i]).numpy())}
             result.append(_dict)
 
         return result

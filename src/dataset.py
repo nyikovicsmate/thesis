@@ -23,14 +23,10 @@ class Dataset(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def _data(self) -> np.ndarray:
-        """Returns the data as a sequence.
+    def _data(self, indexes: List[int]) -> np.ndarray:
+        """Returns the data at given indexes as a sequence.
 
         https://docs.python.org/3/glossary.html#term-sequence
-
-        'An iterable which supports efficient element access using integer indices
-        via the __getitem__() special method and defines a __len__() method that
-        returns the length of the sequence.'
         """
         pass
 
@@ -48,24 +44,22 @@ class Dataset(metaclass=ABCMeta):
         self._handle = None
         self._iter = Dataset.DatasetIterator(self)
 
-    def __init_subclass__(cls, **kwargs):
-        super().__init_subclass__(**kwargs)
+    # def __init_subclass__(cls, **kwargs):
+    #     super().__init_subclass__(**kwargs)
+    #
+    #     def resource_property(func, *args):
+    #         @property
+    #         def wrapper(self):
+    #             if self._handle is None:
+    #                 raise SyntaxError("Datasets are supposed to be called from within a resource block. "
+    #                                   "Are you missing a 'with' statement?")
+    #             return func(self, args)
+    #         return wrapper
+    #     cls._data = resource_property(cls._data, None)
 
-        def resource_property(func):
-            @property
-            def wrapper(self):
-                if self._handle is None:
-                    raise SyntaxError("Datasets are supposed to be called from within a resource block. "
-                                      "Are you missing a 'with' statement?")
-                return func(self)
-            return wrapper
-        cls._data = resource_property(cls._data)
-
+    @abstractmethod
     def __len__(self):
-        return len(self._data)
-
-    def __getitem__(self, item):
-        return self._data[item]
+        pass
 
     def __iter__(self):
         self._iter.reset()
@@ -178,8 +172,8 @@ class Dataset(metaclass=ABCMeta):
 
     def transform(self):
         """Sets a transformation flag on the dataset. If the flag is set, it makes the
-        dataset return transformed items. Transformations include: rotating 90, 180, 270,
-        and flipping."""
+        dataset return transformed items. Transformations include: rotating 0, 90, 180, 270,
+        and vertical flipping."""
         _copy = copy.copy(self)
         _copy._iter.args = {"transform": True, "transform_id": 0}
         return _copy
@@ -262,7 +256,7 @@ class Dataset(metaclass=ABCMeta):
                     if self._args["drop_remainder"] is True:
                         raise StopIteration()
                 # we got through all the checks
-                # apply the built in transformatins
+                # apply the built in transformations
                 if self._args["transform"] is True:
                     result = np.array(list(map(self._transform, result)), dtype=result.dtype)
                 # apply the mapping transformations
@@ -313,7 +307,7 @@ class Dataset(metaclass=ABCMeta):
                 # h5py supports index ranges, read times are significantly faster
                 # than reading each image separately
                 # but with random indexes the indexes must be in ascending order
-                images_sorted = np.array(self.dataset._data[idxs_sorted], dtype=np.uint8)
+                images_sorted = np.array(self.dataset._data(idxs_sorted), dtype=np.float32)
                 # drawback of this implementation, is that the images are read in the wrong order,
                 # so we have to unsort them
                 positions = dict(zip(idxs_sorted, np.arange(len(idxs_sorted))))
@@ -322,8 +316,8 @@ class Dataset(metaclass=ABCMeta):
                     images[i] = images_sorted[positions[idx]]
                 result = images
             else:
-                result = np.array(self.dataset._data[list(idxs)], dtype=np.uint8)
-            # reshape the result if necessar to ensure it's 4D (count, height, width, depth)
+                result = np.array(self.dataset._data(list(idxs)), dtype=np.float32)
+            # reshape the result if necessary to ensure it's 4D (count, height, width, depth)
             if len(result.shape) < 4:
                 result = np.reshape(result, (*result.shape, 1))
             return result
@@ -348,8 +342,11 @@ class DirectoryDataset(Dataset):
         self._handle = None
         return False
 
-    def _data(self) -> np.ndarray:
-        return np.array([cv2.imread(str(path), cv2.IMREAD_COLOR) for path in self._handle], dtype=np.uint8)
+    def _data(self, indexes: List[int]) -> np.ndarray:
+        return np.array([cv2.imread(str(self._handle[idx]), cv2.IMREAD_COLOR) for idx in indexes], dtype=np.float32)
+
+    def __len__(self):
+        return len(self._handle)
 
 
 class HDFDataset(Dataset):
@@ -372,5 +369,8 @@ class HDFDataset(Dataset):
         # re-raise any other exception that might have happened
         return False
 
-    def _data(self) -> np.ndarray:
-        return self._handle["images"]
+    def _data(self, indexes: List[int]) -> np.ndarray:
+        return self._handle["images"][indexes]
+
+    def __len__(self):
+        return len(self._handle["images"])
