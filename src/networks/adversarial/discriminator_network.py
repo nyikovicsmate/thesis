@@ -93,7 +93,7 @@ class DiscriminatorNetwork(Network):
             self.state.epochs += 1
             self.state.train_loss = train_loss.numpy()
             self.state.train_time = delta_sec
-            LOGGER.info(f"Epoch: {e_idx} train_loss: {train_loss:.2f}")
+            LOGGER.info(f"Epoch: {self.state.epochs} train_loss: {self.state.train_loss:.4f}")
             if callbacks:
                 # manually update learning rate and call iteration end callbacks
                 for cb in callbacks:

@@ -275,7 +275,7 @@ class TrainingEvaluationCallback(TrainIterationEndCallback):
             "train_time": str(inst.state.train_time),
             "metrics": metrics_json
         }
-        with open(str(self._dest_dir.joinpath("eval.json")), mode="w") as logfile:
+        with open(str(file), mode="w") as logfile:
             # logfile.write(f"epoch: {inst.state.epochs} loss: {inst.state.train_loss} train_time: {inst.state.train_time}")
             # logfile.write(str(metrics))
             json.dump(contents, logfile, indent=4)

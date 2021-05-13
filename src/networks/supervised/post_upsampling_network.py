@@ -49,14 +49,16 @@ class PostUpsamplingNetwork(Network):
             start_sec = time.time()
             # process a batch
             random_y_idx = 0 if len(y) == 1 else np.random.randint(len(y))
+            acc = 0
             for x_b, y_b in zip_longest(x, y[random_y_idx]):
                 train_loss += self._train_step(x_b, y_b, loss_func)
+                acc += len(y_b)
             # update state
             delta_sec = time.time() - start_sec
             self.state.epochs += 1
-            self.state.train_loss = train_loss.numpy()
+            self.state.train_loss = train_loss.numpy() / (acc * np.prod(np.array(y_b).shape[1:-1])) * 255.0
             self.state.train_time = delta_sec
-            LOGGER.info(f"Epoch: {e_idx} train_loss: {train_loss:.2f}")
+            LOGGER.info(f"Epoch: {self.state.epochs} train_loss: {self.state.train_loss:.4f}")
             if callbacks:
                 # manually update learning rate and call iteration end callbacks
                 for cb in callbacks:

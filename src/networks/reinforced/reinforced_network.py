@@ -1,6 +1,7 @@
 from itertools import zip_longest
 from typing import Callable
 
+import cv2
 import numpy as np
 import tensorflow as tf
 
@@ -17,64 +18,65 @@ class ReinforcedNetwork(Network):
     """
 
     @property
-    def noise_func(self):
-        return self._noise_func
+    def scale_func(self):
+        return self._scale_func
 
-    @noise_func.setter
-    def noise_func(self, func: Callable):
+    @scale_func.setter
+    def scale_func(self, func: Callable):
         if not isinstance(func, Callable):
             raise TypeError("Noise function must be an instance of `typing.Callable`.")
         if func.__code__.co_argcount != 1:
             raise AttributeError(
-                f"Noise function must have exactly 1 parameter, the image which to process. Got {func.__code__.co_varnames}")
+                f"Scale function must have exactly 1 parameter, the batch of images to process. Got {func.__code__.co_varnames}")
         test_img = np.zeros(shape=(1, 10, 10, 3), dtype=np.float32)
         ret = func(test_img)
         if type(ret) is not np.ndarray and len(ret.shape) != 4:
             raise TypeError(
-                "Noise function must return 4D numpy.ndarray type with (batch, height, width, channel) dimensions.")
-        self._noise_func = func
+                "Scale function must return 4D numpy.ndarray type with (batch, height, width, channel) dimensions.")
+        self._scale_func = func
 
     @staticmethod
-    def _normalized_noise_func(images: np.ndarray) -> np.ndarray:
+    def _normalized_scale_func(images: np.ndarray) -> np.ndarray:
         """
-        Adds noise to image.
+        Scales the image (x2) by filling the missing values with a constant `fill_value`.
         :param images: A batch of images, 4D array (batch, height, width, channels)
-        :return: The noisy batch of input images.
+        :return: The upscaled batch of input images.
         """
-        fill_value = 0.5
+        # TODO: make it a primitive scaling algorithm
+        # fill_value = 0.5
         try:
             # this will fail unless there is exactly 4 dimensions to unpack from
             batch, height, width, channels = images.shape
         except ValueError:
             raise TypeError(f"Image must be a 4D numpy array. Got shape {images.shape}")
-        if channels == 1:
-            for img in images:
-                for h in range(height):
-                    if h % 2 == 0:
-                        img[h][0::2] = [fill_value]
-                    else:
-                        img[h][1::2] = [fill_value]
-        elif channels == 3:
-            for img in images:
-                for h in range(height):
-                    if h % 2 == 0:
-                        img[h][0::2] = [fill_value, fill_value, fill_value]
-                    else:
-                        img[h][1::2] = [fill_value, fill_value, fill_value]
-        else:
-            raise ValueError(f"Unsupported number of image dimensions, got {channels}")
-        return images
+        # if channels == 1:
+        #     for img in images:
+        #         for h in range(height):
+        #             if h % 2 == 0:
+        #                 img[h][0::2] = [fill_value]
+        #             else:
+        #                 img[h][1::2] = [fill_value]
+        # elif channels == 3:
+        #     for img in images:
+        #         for h in range(height):
+        #             if h % 2 == 0:
+        #                 img[h][0::2] = [fill_value, fill_value, fill_value]
+        #             else:
+        #                 img[h][1::2] = [fill_value, fill_value, fill_value]
+        # else:
+        #     raise ValueError(f"Unsupported number of image dimensions, got {channels}")
+        return tf.image.resize(images, (height*2, width*2), method=tf.image.ResizeMethod.BICUBIC, antialias=False)
 
     def __init__(self):
         model = ReinforcedModel()
         super().__init__(model)
-        self._steps_per_episode = 7
+        self._steps_per_episode = 5
         self._discount_factor = 0.95
-        self._noise_func = ReinforcedNetwork._normalized_noise_func
+        self._scale_func = ReinforcedNetwork._normalized_scale_func
 
     def _predict(self, x: tf.Tensor, *args, **kwargs) -> tf.Tensor:
         self._parse_predict_optionals(x, args, kwargs)  # keep it for the logs
-        x = tf.convert_to_tensor(self.noise_func(x.numpy()))
+        x = tf.convert_to_tensor(self.scale_func(x.numpy()))
         s_t0_channels = tf.split(x, num_or_size_splits=x.shape[-1], axis=3)
         result = None
         for s_t0 in s_t0_channels:
@@ -107,11 +109,11 @@ class ReinforcedNetwork(Network):
                 # sample the actions
                 sampled_a_t = self._sample_random(a_t)
                 # clip distribution into range to avoid 0 values, which cause problem with calculating logarithm
-                # a_t = tf.clip_by_value(a_t, 1e-6, 1)
-                # a_t_log = tf.math.log(a_t)
-                # past_action_log_prob[t] = self._mylog_prob(a_t_log, sampled_a_t)
-                past_action_log_prob[t] = tf.math.log(self._mylog_prob(a_t, sampled_a_t))
-                # past_action_entropy[t] = self._myentropy(a_t, a_t_log)
+                a_t = tf.clip_by_value(a_t, 1e-6, 1)
+                a_t_log = tf.math.log(a_t)
+                past_action_log_prob[t] = self._mylog_prob(a_t_log, sampled_a_t)
+                # past_action_log_prob[t] = tf.math.log(self._mylog_prob(a_t, sampled_a_t))
+                past_action_entropy[t] = self._myentropy(a_t, a_t_log)
                 V[t] = V_t
                 # update the current state/image with the predicted actions
                 s_t1 = tf.convert_to_tensor(State.update(s_t0.numpy(), sampled_a_t.numpy()), dtype=tf.float32)
@@ -123,20 +125,20 @@ class ReinforcedNetwork(Network):
             R = 0
             actor_loss = 0
             critic_loss = 0
-            # beta = 1e-2
+            beta = 1e-2
             for t in reversed(range(self._steps_per_episode)):
                 R *= self._discount_factor
                 R += r[t]
                 A = R - V[t]  # advantage
                 # Accumulate gradients of policy
                 log_prob = past_action_log_prob[t]
-                # entropy = past_action_entropy[t]
+                entropy = past_action_entropy[t]
 
                 # Log probability is increased proportionally to advantage
                 actor_loss += -log_prob * A
                 # Entropy is maximized
-                # actor_loss -= beta * entropy
-                # actor_loss *= 0.5  # multiply loss by 0.5 coefficient
+                actor_loss -= beta * entropy
+                actor_loss *= 0.5  # multiply loss by 0.5 coefficient
                 # Accumulate gradients of value function
                 critic_loss += A ** 2
 
@@ -154,8 +156,6 @@ class ReinforcedNetwork(Network):
         y_b = next(iter(y))
         assert x_b.shape[-1] == y_b.shape[-1] == 1, \
             f"Reinforced network uses single channel images for training. Got dimensions x: {x_b.shape[-1]}, y: {y_b.shape[-1]}"
-        assert x_b.shape[1:3] == y_b.shape[1:3], \
-            f"Both datasets must have similarly sized images. Got shapes x: {x_b.shape[1:3]}, y: {y_b.shape[1:3]}"
         learning_rate = tf.Variable(learning_rate)  # wrap variable according to callbacks.py:25
         optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate,
                                              beta_1=0.9,
@@ -168,7 +168,7 @@ class ReinforcedNetwork(Network):
             start_sec = time.time()
             # process a batch
             for x_b, y_b in zip_longest(x, y):
-                reward, loss = self._train_step(self.noise_func(x_b), y_b, optimizer)
+                reward, loss = self._train_step(self.scale_func(x_b), y_b, optimizer)
                 episode_r += reward
                 train_loss += loss 
             # update state

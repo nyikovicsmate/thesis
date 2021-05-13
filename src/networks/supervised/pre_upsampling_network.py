@@ -57,7 +57,7 @@ class PreUpsamplingNetwork(Network):
             self.state.epochs += 1
             self.state.train_loss = train_loss.numpy() / (acc * np.prod(np.array(y_b).shape[1:-1])) * 255.0
             self.state.train_time = delta_sec
-            LOGGER.info(f"Epoch: {e_idx} train_loss: {self.state.train_loss:.4f}")
+            LOGGER.info(f"Epoch: {self.state.epochs} train_loss: {self.state.train_loss:.4f}")
             if callbacks:
                 # manually update learning rate and call iteration end callbacks
                 for cb in callbacks:
